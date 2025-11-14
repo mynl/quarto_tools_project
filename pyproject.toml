@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quarto-tools"
+dynamic = ["version"]
+description = "Utilities for working with Quarto projects (TOC, trimmed BibTeX, etc.)"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [
+  { name = "Stephen Mildenhall" }
+]
+dependencies = [
+  "pandas>=2.2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "ruff>=0.5",
+]
+
+[project.urls]
+Homepage = "https://www.mynl.com/quarto-tools"
+Repository = "https://github.com/mynl/quarto-tools"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = { attr = "quarto_tools.__version__" }
+
+[project.scripts]
+qt = "quarto_tools.cli:entry"
