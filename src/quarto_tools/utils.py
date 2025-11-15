@@ -13,6 +13,12 @@ from typing import Any, Iterable, Tuple
 import re
 
 
+# Common Quarto cross-reference prefixes and suffixes, used by both
+# BibTeX and cross-reference tools.
+QUARTO_XREF_PREFIXES = "sec|fig|tbl|eq|ch|def|thm|exr|exm|lem|prp|nte|sol|REF"
+QUARTO_XREF_SUFFIXES = r":\.\:\-_"
+
+
 def discover_quarto_sources(
     base_dir: Path,
     encoding: str = "utf-8",

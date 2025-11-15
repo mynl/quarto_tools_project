@@ -1,428 +1,337 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-quarto_tools.py
-
-Scan a Quarto project tree for label definitions and references in .qmd files.
-
-Inputs:
-    dir_in: a Path to the directory to scan (searched recursively).
-
-Outputs:
-    Two pandas.DataFrames:
-        defs_df:    rows for each label definition (e.g., {#sec-...}, {#fig-...}, "#| label: tbl-...")
-        refs_df:    rows for each label reference (e.g., @sec-..., @fig-..., @tbl-..., @eq-...)
-
-Columns (both frames share most columns):
-    dirname         directory containing file, relative to dir_in
-    filename        file name (e.g., "post.qmd")
-    relpath         POSIX-style relative path from dir_in to file
-    line_no         1-based line number where the match occurs
-    col_start       1-based column index of the match start
-    col_end         1-based column index of the match end (inclusive)
-    match_text      exact matched text (e.g., "{#sec-intro}" or "@fig-setup")
-    label           normalized label (e.g., "sec-intro" or "fig-setup")
-    kind            for defs: one of {"attr_id","chunk_label"}; for refs: {"xref"}
-    prefix          leading type prefix if present (e.g., "sec","fig","tbl","eq"), else ""
-    header_ctx      nearest preceding ATX header text on or above this line (best-effort)
-    fence_ignored   False (rows always excluded from fenced code)
-
-Notes:
-    - Fenced code blocks (``` … ```) are skipped so code samples do not pollute results.
-    - Citations like [@smith2020] are ignored; only cross-ref-style "@label" tokens are collected.
-    - Later renaming support can operate by joining on (relpath, line_no, col_start, col_end).
-
-Windows:
-    Run as:  python -m quarto_labels --dir-in X:\path\to\project
-"""
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import re
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Iterable, Iterator, List, Tuple
 
-import click
 import pandas as pd
 
+from .utils import (discover_quarto_sources, extract_front_matter,
+                    QUARTO_XREF_PREFIXES,
+                    QUARTO_XREF_SUFFIXES,
+                    )
 
-# Regex for fenced code blocks start/end (supports language/class fences)
-FENCE_RE = re.compile(r"^(```+|~~~+)")
-# ATX headers for simple section context extraction
-ATX_HEADER_RE = re.compile(r"^(#{1,6})\s+(.*)$")
-
-# Definitions:
-#   1) Pandoc/Quarto attribute identifiers: {#label} anywhere on a line (often after headers, figures, equations)
-ATTR_ID_RE = re.compile(r"\{#([A-Za-z0-9:_\-\.]+)\}")
-#   2) Quarto/knitr-style chunk metadata comment: '#| label: xxx'
-CHUNK_LABEL_RE = re.compile(r"^\s*#\|\s*label\s*:\s*([A-Za-z0-9:_\-\.]+)\s*$")
-
-# References:
-#   Cross-refs are '@label' tokens. We:
-#    - exclude citations '[@key]' via negative lookbehind for '['
-#    - allow prefixes like sec-, fig-, tbl-, eq-, lst-, algo-, thm-, etc., but do not require them
-#   Capture group 1 is the label without the leading '@'
-XREF_RE = re.compile(r"(?<!\[)@([A-Za-z0-9:_\-\.]+)")
-
-# Typical prefixes to extract (not enforced for validity; used for the 'prefix' column only)
-KNOWN_PREFIXES = ("sec", "fig", "tbl", "eq", "lst", "algo", "thm", "lem", "cor", "def", "prp", "exm", "app", "ch")
+# Keys that look like Quarto-style cross references, based on shared prefixes.
+CROSS_REF_KEY_RE = re.compile(
+        r"^(?:" + QUARTO_XREF_PREFIXES + r")[" + QUARTO_XREF_SUFFIXES + r"]"
+        )
 
 
-@dataclass(frozen=True)
-class MatchRow:
-    dirname: str
-    filename: str
-    relpath: str
-    line_no: int
-    col_start: int
-    col_end: int
-    match_text: str
-    label: str
-    kind: str
-    prefix: str
-    header_ctx: str
-    fence_ignored: bool = False  # retained for schema stability; always False for yielded rows
+def _split_prefix(label: str) -> str:
+    """Return the prefix of a label up to the first '-', ':' or '.'.
 
-
-def _nearest_prefix(label: str) -> str:
+    If none of these separators appear, return the full label.
     """
-    Extract known prefix from a label if present. E.g., 'fig-setup' -> 'fig'.
-    Returns empty string if no known prefix is found.
-    """
-    if "-" in label:
-        maybe = label.split("-", 1)[0]
-        if maybe in KNOWN_PREFIXES:
-            return maybe
-    return ""
-
-
-def _iter_qmd_files(root: Path) -> Iterator[Path]:
-    """
-    Yield .qmd files under root recursively.
-    """
-    yield from root.rglob("*.qmd")
+    for sep in ("-", ":", "."):
+        idx = label.find(sep)
+        if idx != -1:
+            return label[:idx]
+    return label
 
 
 def _collect_header_context(lines: List[str]) -> List[str]:
-    """
-    Build a list mapping each line index to the nearest preceding ATX header text.
-    """
-    ctx: List[str] = [""] * len(lines)
-    current = ""
+    """Map each line index to the nearest preceding ATX header text."""
+    ctx: List[str] = ["" for _ in lines]
+    current: str = ""
+    header_re = re.compile(r"^(?<!#\|)(#{1,}) (.*?)(?:$| (\{.*\})$)")
+
     for i, line in enumerate(lines):
-        m = ATX_HEADER_RE.match(line)
+        m = header_re.match(line)
         if m:
-            # Header text without trailing ID braces if present
-            hdr = m.group(2).strip()
-            # Strip trailing attribute ID for clarity in context
-            hdr = ATTR_ID_RE.sub("", hdr).strip()
-            current = hdr
+            current = m.group(2).strip()
         ctx[i] = current
+
     return ctx
 
 
 def _scan_file(
-    file_path: Path,
-    relbase: Path,
-) -> Tuple[List[MatchRow], List[MatchRow]]:
+    path: Path,
+    encoding: str = "utf-8",
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Scan a single QMD file for label definitions and references.
+
+    Returns two lists of dicts: (defs_rows, refs_rows).
     """
-    Scan a single .qmd file for definition and reference matches, skipping fenced code blocks.
-    """
-    text = file_path.read_text(encoding="utf-8", errors="replace")
-    lines = text.splitlines()
-    header_ctx_by_line = _collect_header_context(lines)
 
-    defs: List[MatchRow] = []
-    refs: List[MatchRow] = []
+    text = path.read_text(encoding=encoding)
+    _title, body_lines, _meta = extract_front_matter(text)
+    header_ctx = _collect_header_context(body_lines)
 
-    # Keep simple state for fenced code skipping; supports ``` and ~~~
-    in_fence = False
-    fence_tick = ""
+    defs: List[Dict[str, Any]] = []
+    refs: List[Dict[str, Any]] = []
 
-    relpath = file_path.relative_to(relbase).as_posix()
-    dirname = file_path.parent.relative_to(relbase).as_posix() if file_path.parent != relbase else ""
-    filename = file_path.name
+    # Patterns:
+    #   - inline labels: {#sec-foo}, {... #fig:bar}, etc.
+    inline_label_re = re.compile(r"\{[^}]*?#([A-Za-z0-9:._-]+)[^}]*\}")
+    #   - chunk labels: #| label: fig-my-figure
+    chunk_label_re = re.compile(r"^#\|\s*label:\s*([A-Za-z0-9:._-]+)\s*$")
+    #   - references: @sec-foo, @fig:bar, etc.
+    #     Allow '.' inside but strip trailing '.' that ends a sentence.
+    ref_re = re.compile(r"(?<!@)@([A-Za-z0-9_:+./-]+)\b")
 
-    for idx, line in enumerate(lines):
-        # Fence toggle
-        if FENCE_RE.match(line):
-            tick = FENCE_RE.match(line).group(1)
-            if not in_fence:
-                in_fence = True
-                fence_tick = tick
-            else:
-                # Close only if the same fence-type length opens/closes; be permissive on length
-                in_fence = False
-                fence_tick = ""
+    # Local code-block / HTML-comment toggle, used only for inline labels and refs.
+    incode_rex = re.compile(r"^```|<!\-\-|\-\->|<!\-\-.*?\-\->")
+    incode = False
+
+    for idx, line in enumerate(body_lines):
+        line_no = idx + 1
+        context = header_ctx[idx]
+        line_stripped = line.rstrip("\r\n")
+
+        # Chunk labels  (these live inside code blocks, so we always check them)
+        m_chunk = chunk_label_re.match(line_stripped)
+        if m_chunk:
+            label = m_chunk.group(1).strip()
+            prefix = _split_prefix(label)
+            defs.append(
+                {
+                    "file": path,
+                    "line_no": line_no,
+                    "label": label,
+                    "prefix": prefix,
+                    "kind": "chunk",
+                    "header": context,
+                    "text": line_stripped,
+                }
+            )
+
+        # Toggle code / HTML comment state based on markers on this line.
+        for _ in incode_rex.findall(line_stripped):
+            incode = not incode
+
+        # Inside code: skip inline labels and refs, but we already captured chunk labels.
+        if incode:
             continue
 
-        if in_fence:
-            continue  # ignore content inside fences
-
-        # Definitions: attribute IDs anywhere on line
-        for m in ATTR_ID_RE.finditer(line):
-            label = m.group(1)
-            col_start = m.start() + 1  # 1-based column index
-            col_end = m.end()
+        # Inline labels (may be on header or normal text)
+        for m in inline_label_re.finditer(line_stripped):
+            label = m.group(1).strip()
+            prefix = _split_prefix(label)
             defs.append(
-                MatchRow(
-                    dirname=dirname,
-                    filename=filename,
-                    relpath=relpath,
-                    line_no=idx + 1,
-                    col_start=col_start,
-                    col_end=col_end,
-                    match_text=m.group(0),
-                    label=label,
-                    kind="attr_id",
-                    prefix=_nearest_prefix(label),
-                    header_ctx=header_ctx_by_line[idx],
-                )
+                {
+                    "file": path,
+                    "line_no": line_no,
+                    "label": label,
+                    "prefix": prefix,
+                    "kind": "inline",
+                    "header": context,
+                    "text": line_stripped,
+                }
             )
 
-        # Definitions: chunk comment labels
-        cm = CHUNK_LABEL_RE.match(line)
-        if cm:
-            label = cm.group(1)
-            # Column span: the 'label' token in the line
-            lab_span = re.search(re.escape(label), line)
-            if lab_span:
-                col_start = lab_span.start() + 1
-                col_end = lab_span.end()
-            else:
-                col_start = 1
-                col_end = len(line)
-            defs.append(
-                MatchRow(
-                    dirname=dirname,
-                    filename=filename,
-                    relpath=relpath,
-                    line_no=idx + 1,
-                    col_start=col_start,
-                    col_end=col_end,
-                    match_text=label,
-                    label=label,
-                    kind="chunk_label",
-                    prefix=_nearest_prefix(label),
-                    header_ctx=header_ctx_by_line[idx],
-                )
-            )
-
-        # References: cross-refs '@label' but not citations '[@key]'
-        for m in XREF_RE.finditer(line):
-            label = m.group(1)
-            # Heuristic: skip obvious bibliography citations that contain commas or spaces (rare after our pattern)
-            if "," in label:
+        # References
+        for m in ref_re.finditer(line_stripped):
+            label = m.group(1).rstrip(".").strip()
+            if not label:
                 continue
-            col_start = m.start() + 1
-            col_end = m.end()
+            xref = CROSS_REF_KEY_RE.match(label) is None
+            if xref:
+                # no match -> these are bibtex references
+                continue
+            prefix = _split_prefix(label)
             refs.append(
-                MatchRow(
-                    dirname=dirname,
-                    filename=filename,
-                    relpath=relpath,
-                    line_no=idx + 1,
-                    col_start=col_start,
-                    col_end=col_end,
-                    match_text=m.group(0),
-                    label=label,
-                    kind="xref",
-                    prefix=_nearest_prefix(label),
-                    header_ctx=header_ctx_by_line[idx],
-                )
+                {
+                    "file": path,
+                    "line_no": line_no,
+                    "label": label,
+                    "prefix": prefix,
+                    "xref": xref,
+                    "header": context,
+                    "text": line_stripped,
+                }
             )
 
     return defs, refs
 
 
-def find_labels_and_refs(dir_in: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Walk dir_in for .qmd files and return (defs_df, refs_df).
-    """
-    dir_in = dir_in.resolve()
-    all_defs: List[MatchRow] = []
-    all_refs: List[MatchRow] = []
-
-    for qmd in _iter_qmd_files(dir_in):
-        fdefs, frefs = _scan_file(qmd, dir_in)
-        all_defs.extend(fdefs)
-        all_refs.extend(frefs)
-
-    defs_df = pd.DataFrame([r.__dict__ for r in all_defs])
-    refs_df = pd.DataFrame([r.__dict__ for r in all_refs])
-
-    # Sort for convenience: by relpath then line_no then col_start
-    if not defs_df.empty:
-        defs_df = defs_df.sort_values(["relpath", "line_no", "col_start"], kind="mergesort").reset_index(drop=True)
-    if not refs_df.empty:
-        refs_df = refs_df.sort_values(["relpath", "line_no", "col_start"], kind="mergesort").reset_index(drop=True)
-
-    return defs_df, refs_df
-
-
 def validate_quarto_labels(
     defs_df: pd.DataFrame,
     refs_df: pd.DataFrame,
-    allowed_prefixes: set[str] | None = None,
-) -> dict[str, pd.DataFrame | bool]:
+    allowed_prefixes: Optional[Iterable[str]] = None,
+) -> Dict[str, Any]:
+    """Validate label definitions and references.
+
+    Returns a dictionary with:
+      - ok: bool
+      - duplicate_labels_df: duplicated label definitions
+      - undefined_refs_df: references without a matching definition
+      - unused_defs_df: definitions never referenced
+      - prefix_stats_df: counts of prefixes and allowed/unknown flag
+      - summary_df: high-level summary of counts
     """
-    Validate uniqueness of label definitions and the consistency between
-    label definitions (defs_df) and references (refs_df).
+    if defs_df.empty and refs_df.empty:
+        summary_df = pd.DataFrame(
+            [
+                {"issue": "definitions", "count": 0},
+                {"issue": "references", "count": 0},
+            ]
+        )
+        return {
+            "ok": True,
+            "duplicate_labels_df": defs_df.head(0),
+            "undefined_refs_df": refs_df.head(0),
+            "unused_defs_df": defs_df.head(0),
+            "prefix_stats_df": pd.DataFrame(
+                columns=["prefix", "def_count", "ref_count", "allowed"]
+            ),
+            "summary_df": summary_df,
+        }
 
-    Inputs:
-        defs_df:
-            DataFrame produced by the scanner with at least:
-            ['label','relpath','line_no','col_start','kind','prefix']
-        refs_df:
-            DataFrame produced by the scanner with at least:
-            ['label','relpath','line_no','col_start','kind','prefix']
-        allowed_prefixes:
-            Optional set of allowed label prefixes (e.g., {'sec','fig','tbl','eq'}).
-            If provided, labels with other prefixes are flagged.
+    # Normalize label and prefix columns
+    defs_df = defs_df.copy()
+    refs_df = refs_df.copy()
+    if "label" in defs_df.columns:
+        defs_df["label"] = defs_df["label"].astype(str).str.strip()
+    if "label" in refs_df.columns:
+        refs_df["label"] = refs_df["label"].astype(str).str.strip()
+    if "prefix" in defs_df.columns:
+        defs_df["prefix"] = defs_df["prefix"].astype(str).str.strip()
+    if "prefix" in refs_df.columns:
+        refs_df["prefix"] = refs_df["prefix"].astype(str).str.strip()
 
-    Returns:
-        A dict with:
-            ok: bool  # True iff no duplicates, no undefined refs, no cross-kind/relpath collisions
-            dup_defs_df: DataFrame of labels defined more than once (count > 1)
-            collisions_df: Same label defined in multiple files (relpath nunique > 1), rows are the defining sites
-            cross_kind_df: Same label defined with multiple 'kind' values
-            undefined_refs_df: References whose label is not defined
-            unused_defs_df: Definitions that are never referenced
-            invalid_prefix_defs_df: Definitions with disallowed prefix (only if allowed_prefixes provided)
-            invalid_prefix_refs_df: References with disallowed prefix (only if allowed_prefixes provided)
-            summary_df: One-row counts of each failure category
-    """
-    results: dict[str, pd.DataFrame | bool] = {}
+    # Duplicate label definitions
+    dup_mask = defs_df.duplicated(subset=["label"], keep=False)
+    duplicate_labels_df = defs_df[dup_mask].sort_values(["label", "file", "line_no"])
 
-    # Normalize inputs (empty frames still work)
-    defs = defs_df.copy() if defs_df is not None else pd.DataFrame(columns=["label"])
-    refs = refs_df.copy() if refs_df is not None else pd.DataFrame(columns=["label"])
+    # Undefined references
+    defined_labels: Set[str] = set(defs_df["label"])
+    undefined_refs_df = refs_df[~refs_df["label"].isin(defined_labels)].copy()
+    undefined_refs_df.sort_values(["label", "file", "line_no"], inplace=True)
 
-    # Duplicate definitions by label
-    defs_count = (
-        defs.groupby("label", dropna=False)
-        .agg(count=("label", "size"), n_files=("relpath", "nunique"), kinds=("kind", lambda s: sorted(set(s))))
+    # Unused definitions
+    referenced_labels: Set[str] = set(refs_df["label"])
+    unused_defs_df = defs_df[~defs_df["label"].isin(referenced_labels)].copy()
+    unused_defs_df.sort_values(["label", "file", "line_no"], inplace=True)
+
+    # Prefix statistics
+    def_counts = (
+        defs_df.groupby("prefix", dropna=False)["label"].count().rename("def_count")
+    )
+    ref_counts = (
+        refs_df.groupby("prefix", dropna=False)["label"].count().rename("ref_count")
+    )
+    prefix_stats_df = (
+        pd.concat([def_counts, ref_counts], axis=1)
+        .fillna(0)
         .reset_index()
+        .rename(columns={"index": "prefix"})
     )
-    dup_defs_df = defs_count.loc[defs_count["count"] > 1].sort_values(["count", "label"], ascending=[False, True])
-    results["dup_defs_df"] = dup_defs_df
+    prefix_stats_df["prefix"] = prefix_stats_df["prefix"].astype(str)
 
-    # Collisions: same label defined in multiple files
-    multi_file_labels = set(defs_count.loc[defs_count["n_files"] > 1, "label"])
-    collisions_df = (
-        defs.loc[defs["label"].isin(multi_file_labels)]
-        .sort_values(["label", "relpath", "line_no", "col_start"], kind="mergesort")
-        .reset_index(drop=True)
-    )
-    results["collisions_df"] = collisions_df
-
-    # Cross-kind: same label with multiple definition kinds (e.g., 'attr_id' and 'chunk_label')
-    multi_kind_labels = set(
-        defs_count.loc[defs_count["kinds"].map(len) > 1, "label"]
-    )
-    cross_kind_df = (
-        defs.loc[defs["label"].isin(multi_kind_labels)]
-        .sort_values(["label", "kind", "relpath", "line_no", "col_start"], kind="mergesort")
-        .reset_index(drop=True)
-    )
-    results["cross_kind_df"] = cross_kind_df
-
-    # Undefined references: labels referenced but never defined
-    defined_labels = set(defs["label"].dropna().astype(str))
-    undefined_mask = ~refs["label"].astype(str).isin(defined_labels)
-    undefined_refs_df = refs.loc[undefined_mask].sort_values(
-        ["label", "relpath", "line_no", "col_start"], kind="mergesort"
-    )
-    results["undefined_refs_df"] = undefined_refs_df.reset_index(drop=True)
-
-    # Unused definitions: labels defined but never referenced
-    referenced_labels = set(refs["label"].dropna().astype(str))
-    unused_defs_df = defs.loc[~defs["label"].astype(str).isin(referenced_labels)].sort_values(
-        ["label", "relpath", "line_no", "col_start"], kind="mergesort"
-    )
-    results["unused_defs_df"] = unused_defs_df.reset_index(drop=True)
-
-    # Optional prefix validation
     if allowed_prefixes is not None:
-        # Empty/unknown prefixes are flagged (strict)
-        invalid_prefix_defs_df = defs.loc[~defs["prefix"].isin(allowed_prefixes)].sort_values(
-            ["label", "relpath", "line_no", "col_start"], kind="mergesort"
-        )
-        invalid_prefix_refs_df = refs.loc[~refs["prefix"].isin(allowed_prefixes)].sort_values(
-            ["label", "relpath", "line_no", "col_start"], kind="mergesort"
-        )
+        allowed_set = set(allowed_prefixes)
+        prefix_stats_df["allowed"] = prefix_stats_df["prefix"].isin(allowed_set)
     else:
-        invalid_prefix_defs_df = pd.DataFrame(columns=defs.columns if not defs.empty else [])
-        invalid_prefix_refs_df = pd.DataFrame(columns=refs.columns if not refs.empty else [])
+        prefix_stats_df["allowed"] = pd.NA
 
-    results["invalid_prefix_defs_df"] = invalid_prefix_defs_df.reset_index(drop=True)
-    results["invalid_prefix_refs_df"] = invalid_prefix_refs_df.reset_index(drop=True)
+    # Summary
+    summary_rows = [
+        {"issue": "definitions", "count": int(len(defs_df))},
+        {"issue": "references", "count": int(len(refs_df))},
+        {"issue": "duplicate_labels", "count": int(len(duplicate_labels_df))},
+        {"issue": "undefined_refs", "count": int(len(undefined_refs_df))},
+        {"issue": "unused_defs", "count": int(len(unused_defs_df))},
+    ]
+    if allowed_prefixes is not None:
+        bad_prefixes = prefix_stats_df[
+            prefix_stats_df["allowed"] == False  # noqa: E712
+        ]
+        summary_rows.append(
+            {"issue": "bad_prefixes", "count": int(len(bad_prefixes))}
+        )
 
-    # Summary and overall status
-    summary = {
-        "n_defs": int(len(defs)),
-        "n_refs": int(len(refs)),
-        "dup_defs": int(len(dup_defs_df)),
-        "collision_rows": int(len(collisions_df)),
-        "cross_kind_rows": int(len(cross_kind_df)),
-        "undefined_refs": int(len(undefined_refs_df)),
-        "unused_defs": int(len(unused_defs_df)),
-        "invalid_prefix_defs": int(len(invalid_prefix_defs_df)),
-        "invalid_prefix_refs": int(len(invalid_prefix_refs_df)),
-    }
-    results["summary_df"] = pd.DataFrame([summary])
+    summary_df = pd.DataFrame(summary_rows)
 
     ok = (
-        summary["dup_defs"] == 0
-        and summary["collision_rows"] == 0
-        # do not regard cross kind as an error
-        # and summary["cross_kind_rows"] == 0
-        and summary["undefined_refs"] == 0
+        len(duplicate_labels_df) == 0
+        and len(undefined_refs_df) == 0
+        and (
+            allowed_prefixes is None
+            or not any(prefix_stats_df["allowed"] == False)  # noqa: E712
+        )
     )
-    results["ok"] = ok
 
-    return results
+    return {
+        "ok": ok,
+        "duplicate_labels_df": duplicate_labels_df,
+        "undefined_refs_df": undefined_refs_df,
+        "unused_defs_df": unused_defs_df,
+        "prefix_stats_df": prefix_stats_df,
+        "summary_df": summary_df,
+    }
 
 
-@click.command()
-@click.option(
-    "--dir-in",
-    "dir_in",
-    type=click.Path(path_type=Path, exists=True, file_okay=False, dir_okay=True),
-    required=True,
-    help="Root directory to scan recursively for .qmd files.",
-)
-@click.option(
-    "--out-prefix",
-    "out_prefix",
-    type=str,
-    default="qmd_labels",
-    show_default=True,
-    help="Prefix for optional CSV outputs: {prefix}_defs.csv and {prefix}_refs.csv in dir_in.",
-)
-@click.option(
-    "--write-csv/--no-write-csv",
-    default=False,
-    show_default=True,
-    help="If set, write CSVs beside dir_in using out-prefix.",
-)
-def entry(dir_in: Path, out_prefix: str, write_csv: bool) -> None:
+@dataclass
+class QuartoXRefs:
+    """Scan a Quarto project for label definitions and references.
+
+    This class discovers .qmd sources using the same logic as QuartoToc,
+    extracts label definitions and references, and provides basic validation.
     """
-    CLI entry point: prints summary counts; optionally writes CSVs to dir_in.
-    """
-    defs_df, refs_df = find_labels_and_refs(dir_in)
 
-    click.echo(f"Scanned: {dir_in}")
-    click.echo(f"Definitions: {len(defs_df)}")
-    click.echo(f"References:  {len(refs_df)}")
+    base_dir: Path
+    project_yaml: Optional[Path] = None
+    file_patterns: Tuple[str, ...] = ()
+    explicit_files: Tuple[Path, ...] = ()
+    encoding: str = "utf-8"
+    allowed_prefixes: Optional[Tuple[str, ...]] = tuple(QUARTO_XREF_PREFIXES.split("|"))
 
-    if write_csv:
-        defs_path = Path(dir_in) / f"{out_prefix}_defs.csv"
-        refs_path = Path(dir_in) / f"{out_prefix}_refs.csv"
-        defs_df.to_csv(defs_path.as_posix(), index=False, encoding="utf-8")
-        refs_df.to_csv(refs_path.as_posix(), index=False, encoding="utf-8")
-        click.echo(f"Wrote: {defs_path}")
-        click.echo(f"Wrote: {refs_path}")
+    defs_df: Optional[pd.DataFrame] = field(default=None, init=False)
+    refs_df: Optional[pd.DataFrame] = field(default=None, init=False)
 
+    def _discover_sources(self) -> List[Path]:
+        """Discover .qmd sources using quarto_tools.utils."""
+        sources, _project_title = discover_quarto_sources(
+            base_dir=self.base_dir,
+            encoding=self.encoding,
+            project_yaml=self.project_yaml,
+            file_patterns=self.file_patterns,
+            explicit_files=self.explicit_files,
+        )
+        return sources
 
-if __name__ == "__main__":
-    entry()
+    def scan(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Scan project sources and populate defs_df and refs_df."""
+        sources = self._discover_sources()
+
+        all_defs: List[Dict[str, Any]] = []
+        all_refs: List[Dict[str, Any]] = []
+
+        for path in sources:
+            defs_rows, refs_rows = _scan_file(path, encoding=self.encoding)
+            all_defs.extend(defs_rows)
+            all_refs.extend(refs_rows)
+
+        self.defs_df = pd.DataFrame(all_defs)
+        self.refs_df = pd.DataFrame(all_refs)
+
+        # Make file paths relative to base_dir to keep tables narrow and readable.
+        if not self.defs_df.empty and "file" in self.defs_df.columns:
+            self.defs_df["file"] = self.defs_df["file"].apply(
+                lambda p: p.relative_to(self.base_dir)
+                if isinstance(p, Path) and (p == self.base_dir or self.base_dir in p.parents)
+                else p
+            )
+        if not self.refs_df.empty and "file" in self.refs_df.columns:
+            self.refs_df["file"] = self.refs_df["file"].apply(
+                lambda p: p.relative_to(self.base_dir)
+                if isinstance(p, Path) and (p == self.base_dir or self.base_dir in p.parents)
+                else p
+            )
+
+        return self.defs_df, self.refs_df
+
+    def validate(self) -> Dict[str, Any]:
+        """Validate labels and references, returning a summary dictionary."""
+        if self.defs_df is None or self.refs_df is None:
+            self.scan()
+
+        assert self.defs_df is not None
+        assert self.refs_df is not None
+
+        return validate_quarto_labels(
+            defs_df=self.defs_df,
+            refs_df=self.refs_df,
+            allowed_prefixes=self.allowed_prefixes,
+        )

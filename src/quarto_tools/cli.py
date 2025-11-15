@@ -8,6 +8,7 @@ import click
 
 from .toc import QuartoToc
 from .bibtex import QuartoBibTex
+from .xref import QuartoXRefs
 
 
 @click.group()
@@ -223,3 +224,88 @@ def bibtex(project_root, bib_out, df_out, win_encoding): # , make_links):
     #     num = qb.write_links(links_out)
     #     click.echo(f"Wrote {num} links to {links_out}.")
 
+
+@entry.command()
+@click.argument(
+    "project_root",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+)
+@click.option(
+    "-w", "--write-csv",
+    is_flag=True,
+    help="Write defs/refs CSV files alongside the project root.",
+)
+@click.option(
+    "-o","--out-prefix",
+    type=str,
+    default="quarto_xrefs",
+    show_default=True,
+    help="Filename prefix for CSV outputs (without extension).",
+)
+@click.option(
+    "-f","--fail-on-error",
+    is_flag=True,
+    default=False,
+    help="Exit with non-zero status if issues are found.",
+)
+def xrefs(project_root, write_csv, out_prefix, fail_on_error):
+    """
+    Scan a Quarto project for label definitions and references and report issues.
+    """
+    from greater_tables import GT
+
+    xr = QuartoXRefs(base_dir=project_root)
+    defs_df, refs_df = xr.scan()
+    results = xr.validate()
+
+    summary_df = results["summary_df"]
+
+    # output results
+    ff = lambda x: f'{int(x):d}'
+    # for k, v in results.items():
+    for k in ['summary_df', 'duplicate_labels_df', 'undefined_refs_df']:
+        v = results[k]
+        try:
+            print(k)
+            print('=' * len(k))
+            print()
+            print(GT(v, large_ok=True, formatters={
+                'def_count': ff,
+                'ref_count': ff,
+                'xref': ff,
+                # actaully boolean
+                "allowed": lambda x: 'Yes' if x else 'No'
+                 },
+                 max_table_inch_width=12,
+                 show_index=False))
+            print()
+        except:
+            print(f'ISSUE with {k}')
+            print(v)
+
+    if write_csv:
+
+        # write in calling dir for now
+        project_root = Path('.')
+
+        defs_path = project_root / f"{out_prefix}_defs.csv"
+        refs_path = project_root / f"{out_prefix}_refs.csv"
+        results["duplicate_labels_df"].to_csv(
+            project_root / f"{out_prefix}_duplicate_labels.csv",
+            index=False,
+        )
+        results["undefined_refs_df"].to_csv(
+            project_root / f"{out_prefix}_undefined_refs.csv",
+            index=False,
+        )
+        results["unused_defs_df"].to_csv(
+            project_root / f"{out_prefix}_unused_defs.csv",
+            index=False,
+        )
+        defs_df.to_csv(defs_path, index=False)
+        refs_df.to_csv(refs_path, index=False)
+        click.echo(f"Wrote defs to {defs_path}")
+        click.echo(f"Wrote refs to {refs_path}")
+
+    if fail_on_error and not results["ok"]:
+        raise SystemExit(1)

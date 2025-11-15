@@ -16,7 +16,10 @@ import re
 
 import pandas as pd
 
-from .utils import discover_quarto_sources, extract_front_matter, strip_code_blocks
+from .utils import (discover_quarto_sources, extract_front_matter,
+                    strip_code_blocks,
+                    QUARTO_XREF_PREFIXES, QUARTO_XREF_SUFFIXES,
+                    )
 
 
 def parse_bibtex_text(text: str) -> list[dict[str, str]]:
@@ -158,8 +161,8 @@ class QuartoBibTex:
     file_patterns: tuple[str, ...] = ()
     explicit_files: tuple[Path, ...] = ()
     encoding: str = "utf-8"
-    ignore_key_prefixes: str = "sec|fig|tbl|eq|ch|def|thm|exr|exm|lem|prp|REF"
-    ignore_key_suffixes: str = r":\.\:\-_"
+    ignore_key_prefixes: str = QUARTO_XREF_PREFIXES
+    ignore_key_suffixes: str = QUARTO_XREF_SUFFIXES
 
     trusted_url_patterns: tuple[str, ...] = (
         "acm.org",
