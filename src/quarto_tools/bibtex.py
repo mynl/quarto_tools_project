@@ -206,12 +206,23 @@ class QuartoBibTex:
                     "]"
                     )
         self.ignore_prefix_re = re.compile(pattern)
+        self._bib_paths = []
 
     @property
     def df(self):
         if self._df is None:
             self.make_df()
         return self._df
+
+    @property
+    def bib_paths(self):
+        if self._bib_paths:
+            s = (f'Found {len(self._bib_paths)} bibtex files:\n\t' +
+                '\n\t'.join(p.name for p in self._bib_paths))
+
+        else:
+            s = 'No bibtex files found.'
+        return s
 
     def _discover_sources(self) -> list[Path]:
         """
@@ -317,9 +328,6 @@ class QuartoBibTex:
             # Project-level bibliography paths are relative to base_dir.
             paths.append(self.base_dir / entry)
 
-        print(f'Found {len(paths)} bibtex files:\n\t', sep='', end='')
-        print('\n\t'.join(p.name for p in paths))
-
         return paths
 
     def _bib_paths_from_sources(self, sources: Iterable[Path]) -> list[Path]:
@@ -407,6 +415,8 @@ class QuartoBibTex:
         citation_keys = self.collect_citations(sources)
         # paths of bibtex files found referenced
         bib_paths = self._collect_bib_paths(sources)
+        # store
+        self._bib_paths = bib_paths
 
         rows: list[dict[str, str]] = []
         for path in bib_paths:

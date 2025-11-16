@@ -292,3 +292,147 @@ def git_info(base_dir: Path | str) -> tuple[str, str]:
         return (head or "no-git", "clean" if dirty == "" else "dirty")
     except Exception:
         return ("no-git", "n/a")
+
+
+def resolve_quarto_context(
+    input_path: Path,
+    explicit_files: tuple[Path, ...] = (),
+    file_patterns: tuple[str, ...] = (),
+) -> tuple[Path, Path | None, tuple[str, ...], tuple[Path, ...]]:
+    """
+    Resolve INPUT_PATH into a canonical Quarto project context.
+
+    This function centralizes all path/YAML discovery rules used by the
+    quarto_tools CLI (tidy, toc, xref, bibtex, pytest).  All commands should
+    use this function so that project discovery behaves consistently.
+
+    INPUT_PATH may refer to any of the following:
+
+      (A) A directory containing a _quarto.yml or _quarto.yaml file.
+          → Treated as a Quarto project root.
+          → All project files (chapters, posts, etc.) are discovered using
+            the YAML file.  file_patterns and explicit_files may override
+            this if provided.
+
+      (B) A directory without a Quarto YAML file.
+          → Treated as a generic folder of .qmd files.
+          → Discovery falls back to file_patterns (glob-like) or, if none
+            are supplied, to the default “all .qmd files under directory”.
+          → explicit_files may override this.
+
+      (C) A single .qmd file.
+          → Treated as a one-file “project”.
+          → base_dir is set to the file’s parent.
+          → project_yaml is None.
+          → Unless explicit_files is already given, the .qmd file becomes
+            the only explicit source file and patterns are ignored.
+
+      (D) A standalone _quarto.yml / _quarto.yaml file.
+          → Treated as the project YAML for its parent directory.
+          → This behaves like case (A) except discovery is forced to use
+            this YAML file (even if the directory contains multiple YAMLs).
+
+      (E) Any other file-like path.
+          → Treated as an atypical case with no YAML.
+          → base_dir is input_path.parent.
+          → project_yaml = None.
+          → file_patterns governs discovery unless explicit_files overrides it.
+
+
+    ORDER OF OPERATIONS (resolution algorithm):
+
+    1. Normalize and resolve INPUT_PATH:
+         input_path = input_path.resolve()
+
+    2. If INPUT_PATH is a directory:
+         a. Check for _quarto.yml/_quarto.yaml inside it.
+         b. If found → project directory (case A).
+         c. If not found → generic directory (case B).
+         d. In either case, file_patterns and explicit_files apply normally.
+
+    3. If INPUT_PATH is a .qmd file (case C):
+         a. Treat as a one-file project.
+         b. base_dir = parent directory.
+         c. project_yaml = None.
+         d. If user did not supply explicit -f files,
+            explicit_files = (input_path,), overriding patterns.
+
+    4. If INPUT_PATH is a YAML file (case D):
+         a. Treat it as the project’s main YAML.
+         b. base_dir = parent directory.
+         c. patterns = file_patterns.
+         d. explicit_files override as usual.
+
+    5. Otherwise (case E):
+         a. Treat INPUT_PATH as a file within a generic folder.
+         b. base_dir = input_path.parent.
+         c. project_yaml = None.
+         d. patterns = file_patterns.
+
+    6. Return a tuple:
+         (base_dir, project_yaml, final_patterns, final_explicit_files)
+
+       Here final_patterns and final_explicit_files encode the correct
+       forced precedence rules:
+         - explicit_files always override patterns;
+         - .qmd input_path without explicit_files forces a single-file
+           context and ignores patterns;
+         - YAML always takes precedence for discovery unless overridden.
+
+
+    RETURNS
+    -------
+    (base_dir, project_yaml, patterns, explicit_files) :
+        base_dir : Path
+            Directory forming the root of the discovered project.
+
+        project_yaml : Path | None
+            The discovered/forced Quarto YAML file, if any.
+
+        patterns : tuple[str, ...]
+            Final glob patterns for discovery (possibly empty).
+
+        explicit_files : tuple[Path, ...]
+            Final explicit files to include (may be empty).  If non-empty,
+            discovery must ignore patterns and YAML.
+
+    """
+
+    input_path = input_path.resolve()
+
+    # Case 1: INPUT_PATH is a directory
+    if input_path.is_dir():
+        # Check for _quarto.yml/_quarto.yaml directly inside it
+        yaml = None
+        for name in ("_quarto.yml", "_quarto.yaml"):
+            cand = input_path / name
+            if cand.exists():
+                yaml = cand
+                break
+
+        base_dir = input_path
+        project_yaml = yaml
+        patterns = file_patterns
+        return base_dir, project_yaml, patterns, explicit_files
+
+    # Case 2: INPUT_PATH is a single .qmd
+    if input_path.suffix.lower() == ".qmd":
+        base_dir = input_path.parent
+        project_yaml = None
+        patterns = ()     # ignore -g unless explicitly desired
+        if not explicit_files:
+            explicit_files = (input_path,)
+        return base_dir, project_yaml, patterns, explicit_files
+
+    # Case 3: INPUT_PATH is a project YAML
+    if input_path.name in ("_quarto.yml", "_quarto.yaml"):
+        base_dir = input_path.parent
+        project_yaml = input_path
+        patterns = file_patterns
+        return base_dir, project_yaml, patterns, explicit_files
+
+    # Otherwise: treat as directory-like root
+    base_dir = input_path.parent
+    project_yaml = None
+    patterns = file_patterns
+    return base_dir, project_yaml, patterns, explicit_files
