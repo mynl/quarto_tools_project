@@ -1,0 +1,225 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>quarto_tools.blocks &mdash; quarto_tools  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            quarto_tools
+              <img src="../../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">quarto_tools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">quarto_tools.blocks</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for quarto_tools.blocks</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Utilities for parsing fenced code blocks (e.g. ```{python}```) from QMD files.</span>
+
+<span class="sd">This module is shared by QuartoTidy and QuartoPyTest. Existing classes in</span>
+<span class="sd">quarto_tools do not depend on it.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+
+
+<div class="viewcode-block" id="CodeBlock">
+<a class="viewcode-back" href="../../api.html#quarto_tools.blocks.CodeBlock">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">CodeBlock</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Representation of a fenced code block from a .qmd file.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    file :</span>
+<span class="sd">        The source .qmd file.</span>
+<span class="sd">    block_index :</span>
+<span class="sd">        1-based index of the block within the source file.</span>
+<span class="sd">    lang :</span>
+<span class="sd">        Language declared in the fence (e.g. &quot;python&quot;).</span>
+<span class="sd">    label :</span>
+<span class="sd">        Optional #| label: value inside the block.</span>
+<span class="sd">    caption :</span>
+<span class="sd">        Optional #| ...-cap: caption text inside the block.</span>
+<span class="sd">    code :</span>
+<span class="sd">        The source code contained in the block.</span>
+<span class="sd">    start_line :</span>
+<span class="sd">        Optional starting line number of the code within the file (1-based).</span>
+<span class="sd">    end_line :</span>
+<span class="sd">        Optional ending line number of the code within the file (1-based).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">file</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">block_index</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">lang</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">label</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">caption</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">code</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">start_line</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">end_line</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+
+<span class="c1"># Fenced block: ```{lang ...}\n...code...\n```</span>
+<span class="n">BLOCK_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="sa">r</span><span class="s2">&quot;```{(?P&lt;lang&gt;[a-zA-Z0-9_-]+)[^}]*}\s*\n?(?P&lt;code&gt;.*?)```&quot;</span><span class="p">,</span>
+    <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Chunk annotations inside the block</span>
+<span class="n">LABEL_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;#\|\s*label:\s*(\S+)&quot;</span><span class="p">)</span>
+<span class="n">CAPTION_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;#\|\s*\S*?-cap:\s*[&#39;</span><span class="se">\&quot;</span><span class="s2">](.+?)[&#39;</span><span class="se">\&quot;</span><span class="s2">]&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="extract_code_blocks">
+<a class="viewcode-back" href="../../api.html#quarto_tools.blocks.extract_code_blocks">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">extract_code_blocks</span><span class="p">(</span>
+    <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">file</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">lang</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;python&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">CodeBlock</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Extract fenced code blocks from a QMD string.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    text :</span>
+<span class="sd">        Full .qmd text.</span>
+<span class="sd">    file :</span>
+<span class="sd">        Path to the file (for metadata only).</span>
+<span class="sd">    lang :</span>
+<span class="sd">        If not None, only blocks with this language (case-insensitive) are</span>
+<span class="sd">        returned. If None, all languages are returned.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    list[CodeBlock]</span>
+<span class="sd">        Parsed code block objects, in order.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">blocks</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">CodeBlock</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">match</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">BLOCK_RE</span><span class="o">.</span><span class="n">finditer</span><span class="p">(</span><span class="n">text</span><span class="p">),</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">block_lang</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s2">&quot;lang&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">lang</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">block_lang</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">!=</span> <span class="n">lang</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+            <span class="k">continue</span>
+
+        <span class="n">code</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s2">&quot;code&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Compute line numbers for the code region (exclude fence line).</span>
+        <span class="n">code_start_idx</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="s2">&quot;code&quot;</span><span class="p">)</span>
+        <span class="n">start_line</span> <span class="o">=</span> <span class="n">text</span><span class="p">[:</span><span class="n">code_start_idx</span><span class="p">]</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">end_line</span> <span class="o">=</span> <span class="n">start_line</span> <span class="o">+</span> <span class="n">code</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Extract optional label and caption from inside the block.</span>
+        <span class="n">label_match</span> <span class="o">=</span> <span class="n">LABEL_RE</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+        <span class="n">caption_match</span> <span class="o">=</span> <span class="n">CAPTION_RE</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+
+        <span class="n">label</span> <span class="o">=</span> <span class="n">label_match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="k">if</span> <span class="n">label_match</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">caption</span> <span class="o">=</span> <span class="n">caption_match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="k">if</span> <span class="n">caption_match</span> <span class="k">else</span> <span class="kc">None</span>
+
+        <span class="n">blocks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="n">CodeBlock</span><span class="p">(</span>
+                <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">,</span>
+                <span class="n">block_index</span><span class="o">=</span><span class="n">i</span><span class="p">,</span>
+                <span class="n">lang</span><span class="o">=</span><span class="n">block_lang</span><span class="p">,</span>
+                <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">,</span>
+                <span class="n">caption</span><span class="o">=</span><span class="n">caption</span><span class="p">,</span>
+                <span class="n">code</span><span class="o">=</span><span class="n">code</span><span class="p">,</span>
+                <span class="n">start_line</span><span class="o">=</span><span class="n">start_line</span><span class="p">,</span>
+                <span class="n">end_line</span><span class="o">=</span><span class="n">end_line</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">blocks</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Stephen J. Mildenhall.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

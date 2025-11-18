@@ -1,0 +1,1466 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API reference &mdash; quarto_tools  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+    <link rel="shortcut icon" href="_static/favicon.ico"/>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="quarto_tools" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            quarto_tools
+              <img src="_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-quarto_tools.bibtex">BibTex Module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.bibtex.QuartoBibTex"><code class="docutils literal notranslate"><span class="pre">QuartoBibTex</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.bibtex._parse_entry_fast"><code class="docutils literal notranslate"><span class="pre">_parse_entry_fast()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.bibtex._parse_entry_slow"><code class="docutils literal notranslate"><span class="pre">_parse_entry_slow()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.bibtex.parse_bibtex_text"><code class="docutils literal notranslate"><span class="pre">parse_bibtex_text()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-quarto_tools.blocks">Blocks Module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.blocks.CodeBlock"><code class="docutils literal notranslate"><span class="pre">CodeBlock</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.blocks.extract_code_blocks"><code class="docutils literal notranslate"><span class="pre">extract_code_blocks()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-quarto_tools.cli">CLI Module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.cli._run_qt_line"><code class="docutils literal notranslate"><span class="pre">_run_qt_line()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.cli.qd"><code class="docutils literal notranslate"><span class="pre">qd()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-quarto_tools.consolidate">Consolidate Module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.consolidate.QuartoConsolidate"><code class="docutils literal notranslate"><span class="pre">QuartoConsolidate</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-quarto_tools.pytest_qmd">PyTest_qmd Module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.pytest_qmd.QuartoPyTest"><code class="docutils literal notranslate"><span class="pre">QuartoPyTest</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-quarto_tools.tidy">Tidy Module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.tidy.QuartoTidy"><code class="docutils literal notranslate"><span class="pre">QuartoTidy</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-quarto_tools.toc">TOC Module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.toc.QuartoToc"><code class="docutils literal notranslate"><span class="pre">QuartoToc</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-quarto_tools.utils">Utils Module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.utils.discover_quarto_sources"><code class="docutils literal notranslate"><span class="pre">discover_quarto_sources()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.utils.extract_front_matter"><code class="docutils literal notranslate"><span class="pre">extract_front_matter()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.utils.git_info"><code class="docutils literal notranslate"><span class="pre">git_info()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.utils.resolve_quarto_context"><code class="docutils literal notranslate"><span class="pre">resolve_quarto_context()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.utils.strip_code_blocks"><code class="docutils literal notranslate"><span class="pre">strip_code_blocks()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-quarto_tools.xref">XRef Module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.xref.QuartoXRefs"><code class="docutils literal notranslate"><span class="pre">QuartoXRefs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.xref._collect_header_context"><code class="docutils literal notranslate"><span class="pre">_collect_header_context()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.xref._scan_file"><code class="docutils literal notranslate"><span class="pre">_scan_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.xref._split_prefix"><code class="docutils literal notranslate"><span class="pre">_split_prefix()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#quarto_tools.xref.validate_quarto_labels"><code class="docutils literal notranslate"><span class="pre">validate_quarto_labels()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">quarto_tools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">API reference</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/api.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul><div class="rst-breadcrumbs-buttons" role="navigation" aria-label="Sequential page navigation">
+        <a href="index.html" class="btn btn-neutral float-left" title="quarto_tools" accesskey="p"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+  </div>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="api-reference">
+<h1>API reference<a class="headerlink" href="#api-reference" title="Link to this heading"></a></h1>
+<section id="module-quarto_tools.bibtex">
+<span id="bibtex-module"></span><h2>BibTex Module<a class="headerlink" href="#module-quarto_tools.bibtex" title="Link to this heading"></a></h2>
+<p>BibTeX tools for Quarto projects.</p>
+<p>This module provides:</p>
+<ul class="simple">
+<li><p>Parsing of BibTeX files into pandas DataFrames using a lightweight parser.</p></li>
+<li><p>Extraction of cited keys from .qmd files.</p></li>
+<li><p>Construction of a trimmed .bib file containing only the cited entries.</p></li>
+</ul>
+<dl class="py class">
+<dt class="sig sig-object py" id="quarto_tools.bibtex.QuartoBibTex">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quarto_tools.bibtex.</span></span><span class="sig-name descname"><span class="pre">QuartoBibTex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">project_yaml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_patterns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">explicit_files</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'utf-8'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ignore_key_prefixes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'sec|fig|tbl|eq|ch|def|thm|exr|exm|lem|prp|nte|sol|REF'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ignore_key_suffixes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">':\\.\\:\\-_'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trusted_url_patterns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">('acm.org',</span> <span class="pre">'ams.org',</span> <span class="pre">'aria.org',</span> <span class="pre">'arxiv.org',</span> <span class="pre">'cambridge.org',</span> <span class="pre">'casact.org',</span> <span class="pre">'doi.org',</span> <span class="pre">'elsevier.com',</span> <span class="pre">'ieee.org',</span> <span class="pre">'ifrs.org',</span> <span class="pre">'jstor.org',</span> <span class="pre">'mdpi.com',</span> <span class="pre">'nature.com',</span> <span class="pre">'nber.org',</span> <span class="pre">'oup.com',</span> <span class="pre">'projecteuclid.org',</span> <span class="pre">'sciencedirect.com',</span> <span class="pre">'siam.org',</span> <span class="pre">'soa.org',</span> <span class="pre">'springer.com',</span> <span class="pre">'springerlink.com',</span> <span class="pre">'ssrn',</span> <span class="pre">'tandfonline.com',</span> <span class="pre">'variancejournal.org',</span> <span class="pre">'wiley.com')</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/quarto_tools/bibtex.html#QuartoBibTex"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.bibtex.QuartoBibTex" title="Link to this definition"></a></dt>
+<dd><p>Build trimmed BibTeX files for a Quarto project.</p>
+<dl class="simple">
+<dt>This class:</dt><dd><ul class="simple">
+<li><p>discovers .qmd sources in the same way as QuartoToc,</p></li>
+<li><p>collects cited keys from <a class="reference external" href="mailto:'&#37;&#52;&#48;citekey">‘<span>&#64;</span>citekey</a>’ style references,</p></li>
+<li><p>discovers BibTeX files from project and per-file YAML,</p></li>
+<li><p>parses the BibTeX into a DataFrame,</p></li>
+<li><p>filters to cited keys only,</p></li>
+<li><p>drops noisy fields and cleans URLs,</p></li>
+<li><p>writes a compact .bib file on request.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.bibtex.QuartoBibTex._bib_paths_from_project_yaml">
+<span class="sig-name descname"><span class="pre">_bib_paths_from_project_yaml</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/bibtex.html#QuartoBibTex._bib_paths_from_project_yaml"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.bibtex.QuartoBibTex._bib_paths_from_project_yaml" title="Link to this definition"></a></dt>
+<dd><p>Extract bibliography paths from the project-level YAML, if any.</p>
+<p>Handles only simple patterns:</p>
+<blockquote>
+<div><p>bibliography: refs.bib
+bibliography: [a.bib, b.bib]</p>
+</div></blockquote>
+<p>and multi-line lists:</p>
+<blockquote>
+<div><dl class="simple">
+<dt>bibliography:</dt><dd><ul class="simple">
+<li><p>a.bib</p></li>
+<li><p>b.bib</p></li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.bibtex.QuartoBibTex._bib_paths_from_sources">
+<span class="sig-name descname"><span class="pre">_bib_paths_from_sources</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sources</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/bibtex.html#QuartoBibTex._bib_paths_from_sources"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.bibtex.QuartoBibTex._bib_paths_from_sources" title="Link to this definition"></a></dt>
+<dd><p>Collect bibliography paths from the YAML front matter of each source.</p>
+<p>The ‘bibliography’ field in front matter is interpreted as a list
+of paths, relative to the source file’s directory.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.bibtex.QuartoBibTex._collect_bib_paths">
+<span class="sig-name descname"><span class="pre">_collect_bib_paths</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sources</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/bibtex.html#QuartoBibTex._collect_bib_paths"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.bibtex.QuartoBibTex._collect_bib_paths" title="Link to this definition"></a></dt>
+<dd><p>Collect all BibTeX paths from project YAML and per-file front matter.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.bibtex.QuartoBibTex._discover_sources">
+<span class="sig-name descname"><span class="pre">_discover_sources</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/bibtex.html#QuartoBibTex._discover_sources"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.bibtex.QuartoBibTex._discover_sources" title="Link to this definition"></a></dt>
+<dd><p>Discover the .qmd source files using the same logic as QuartoToc.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.bibtex.QuartoBibTex._filter_url">
+<span class="sig-name descname"><span class="pre">_filter_url</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/quarto_tools/bibtex.html#QuartoBibTex._filter_url"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.bibtex.QuartoBibTex._filter_url" title="Link to this definition"></a></dt>
+<dd><p>Return the URL if it matches a trusted pattern, else None.</p>
+<p>The DataFrame will store missing URLs as NaN if pandas is allowed
+to convert None to its missing value representation.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.bibtex.QuartoBibTex._project_yaml_path">
+<span class="sig-name descname"><span class="pre">_project_yaml_path</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/quarto_tools/bibtex.html#QuartoBibTex._project_yaml_path"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.bibtex.QuartoBibTex._project_yaml_path" title="Link to this definition"></a></dt>
+<dd><p>Return the project YAML path, if available.</p>
+<p>Uses self.project_yaml if provided, else tries _quarto.yml / _quarto.yaml.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.bibtex.QuartoBibTex.collect_citations">
+<span class="sig-name descname"><span class="pre">collect_citations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sources</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">set</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/bibtex.html#QuartoBibTex.collect_citations"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.bibtex.QuartoBibTex.collect_citations" title="Link to this definition"></a></dt>
+<dd><p>Scan project sources and return the set of cited BibTeX keys.</p>
+<p>This looks for <a class="reference external" href="mailto:'&#37;&#52;&#48;key">‘<span>&#64;</span>key</a>’ patterns outside code blocks and filters out
+keys whose prefixes match ignore_key_prefixes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.bibtex.QuartoBibTex.make_df">
+<span class="sig-name descname"><span class="pre">make_df</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/quarto_tools/bibtex.html#QuartoBibTex.make_df"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.bibtex.QuartoBibTex.make_df" title="Link to this definition"></a></dt>
+<dd><p>Build and return the filtered BibTeX DataFrame for cited keys only.</p>
+<dl class="simple">
+<dt>The resulting DataFrame has at least the columns:</dt><dd><ul class="simple">
+<li><p>‘type’</p></li>
+<li><p>‘tag’</p></li>
+</ul>
+</dd>
+</dl>
+<p>plus a subset of common BibTeX fields, with noisy fields removed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.bibtex.QuartoBibTex.write_bib">
+<span class="sig-name descname"><span class="pre">write_bib</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">output_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/quarto_tools/bibtex.html#QuartoBibTex.write_bib"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.bibtex.QuartoBibTex.write_bib" title="Link to this definition"></a></dt>
+<dd><p>Write a compact .bib file containing only the cited entries.</p>
+<dl class="simple">
+<dt>The entries are written in a stable order:</dt><dd><ul class="simple">
+<li><p>sorted by ‘tag’,</p></li>
+<li><p>fields in a fixed order where possible.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.bibtex.QuartoBibTex.write_df">
+<span class="sig-name descname"><span class="pre">write_df</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">output_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/quarto_tools/bibtex.html#QuartoBibTex.write_df"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.bibtex.QuartoBibTex.write_df" title="Link to this definition"></a></dt>
+<dd><p>Write the df to a csv.</p>
+<p>Use encoding = ‘cp1252’</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.bibtex.QuartoBibTex.write_links">
+<span class="sig-name descname"><span class="pre">write_links</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dir_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/quarto_tools/bibtex.html#QuartoBibTex.write_links"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.bibtex.QuartoBibTex.write_links" title="Link to this definition"></a></dt>
+<dd><p>Write links to all files.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quarto_tools.bibtex._parse_entry_fast">
+<span class="sig-prename descclassname"><span class="pre">quarto_tools.bibtex.</span></span><span class="sig-name descname"><span class="pre">_parse_entry_fast</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">entry</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/quarto_tools/bibtex.html#_parse_entry_fast"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.bibtex._parse_entry_fast" title="Link to this definition"></a></dt>
+<dd><p>Fast-path parser for well-behaved entries.</p>
+<p>Uses a single regex to capture fields of the form:</p>
+<blockquote>
+<div><p>key = {value},</p>
+</div></blockquote>
+<p>where ‘value’ may span multiple lines.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quarto_tools.bibtex._parse_entry_slow">
+<span class="sig-prename descclassname"><span class="pre">quarto_tools.bibtex.</span></span><span class="sig-name descname"><span class="pre">_parse_entry_slow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">entry</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/quarto_tools/bibtex.html#_parse_entry_slow"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.bibtex._parse_entry_slow" title="Link to this definition"></a></dt>
+<dd><p>Slow-path parser for entries that defeat the fast regex.</p>
+<dl class="simple">
+<dt>This parser:</dt><dd><ul class="simple">
+<li><p>finds all occurrences of ‘key = {’ (with flexible spacing),</p></li>
+<li><p>slices between successive keys,</p></li>
+<li><p>trims trailing ‘,’</p></li>
+<li><p>strips one trailing ‘}’ if present.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quarto_tools.bibtex.parse_bibtex_text">
+<span class="sig-prename descclassname"><span class="pre">quarto_tools.bibtex.</span></span><span class="sig-name descname"><span class="pre">parse_bibtex_text</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/bibtex.html#parse_bibtex_text"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.bibtex.parse_bibtex_text" title="Link to this definition"></a></dt>
+<dd><p>Parse a BibTeX file into a list of dictionaries.</p>
+<dl class="simple">
+<dt>Each dict contains:</dt><dd><ul class="simple">
+<li><p>‘type’ (entry type, e.g. ‘article’)</p></li>
+<li><p>‘tag’ (the citation key)</p></li>
+<li><p>one key per BibTeX field found</p></li>
+</ul>
+</dd>
+</dl>
+<p>Assumes all values are of the form:</p>
+<blockquote>
+<div><p>field = { … },</p>
+</div></blockquote>
+<p>and that entries are separated by leading ‘&#64;’.</p>
+</dd></dl>
+
+</section>
+<section id="module-quarto_tools.blocks">
+<span id="blocks-module"></span><h2>Blocks Module<a class="headerlink" href="#module-quarto_tools.blocks" title="Link to this heading"></a></h2>
+<p>Utilities for parsing fenced code blocks (e.g. <code class="docutils literal notranslate"><span class="pre">`{python}`</span></code>) from QMD files.</p>
+<p>This module is shared by QuartoTidy and QuartoPyTest. Existing classes in
+quarto_tools do not depend on it.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="quarto_tools.blocks.CodeBlock">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quarto_tools.blocks.</span></span><span class="sig-name descname"><span class="pre">CodeBlock</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">block_index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lang</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">caption</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">code</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_line</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_line</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/quarto_tools/blocks.html#CodeBlock"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.blocks.CodeBlock" title="Link to this definition"></a></dt>
+<dd><p>Representation of a fenced code block from a .qmd file.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="quarto_tools.blocks.CodeBlock.file">
+<span class="sig-name descname"><span class="pre">file</span></span><a class="headerlink" href="#quarto_tools.blocks.CodeBlock.file" title="Link to this definition"></a></dt>
+<dd><p>The source .qmd file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pathlib._local.Path</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="quarto_tools.blocks.CodeBlock.block_index">
+<span class="sig-name descname"><span class="pre">block_index</span></span><a class="headerlink" href="#quarto_tools.blocks.CodeBlock.block_index" title="Link to this definition"></a></dt>
+<dd><p>1-based index of the block within the source file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="quarto_tools.blocks.CodeBlock.lang">
+<span class="sig-name descname"><span class="pre">lang</span></span><a class="headerlink" href="#quarto_tools.blocks.CodeBlock.lang" title="Link to this definition"></a></dt>
+<dd><p>Language declared in the fence (e.g. “python”).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="quarto_tools.blocks.CodeBlock.label">
+<span class="sig-name descname"><span class="pre">label</span></span><a class="headerlink" href="#quarto_tools.blocks.CodeBlock.label" title="Link to this definition"></a></dt>
+<dd><p>Optional #| label: value inside the block.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str | None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="quarto_tools.blocks.CodeBlock.caption">
+<span class="sig-name descname"><span class="pre">caption</span></span><a class="headerlink" href="#quarto_tools.blocks.CodeBlock.caption" title="Link to this definition"></a></dt>
+<dd><p>Optional #| …-cap: caption text inside the block.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str | None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="quarto_tools.blocks.CodeBlock.code">
+<span class="sig-name descname"><span class="pre">code</span></span><a class="headerlink" href="#quarto_tools.blocks.CodeBlock.code" title="Link to this definition"></a></dt>
+<dd><p>The source code contained in the block.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="quarto_tools.blocks.CodeBlock.start_line">
+<span class="sig-name descname"><span class="pre">start_line</span></span><a class="headerlink" href="#quarto_tools.blocks.CodeBlock.start_line" title="Link to this definition"></a></dt>
+<dd><p>Optional starting line number of the code within the file (1-based).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int | None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="quarto_tools.blocks.CodeBlock.end_line">
+<span class="sig-name descname"><span class="pre">end_line</span></span><a class="headerlink" href="#quarto_tools.blocks.CodeBlock.end_line" title="Link to this definition"></a></dt>
+<dd><p>Optional ending line number of the code within the file (1-based).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int | None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quarto_tools.blocks.extract_code_blocks">
+<span class="sig-prename descclassname"><span class="pre">quarto_tools.blocks.</span></span><span class="sig-name descname"><span class="pre">extract_code_blocks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lang</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'python'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#quarto_tools.blocks.CodeBlock" title="quarto_tools.blocks.CodeBlock"><span class="pre">CodeBlock</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/blocks.html#extract_code_blocks"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.blocks.extract_code_blocks" title="Link to this definition"></a></dt>
+<dd><p>Extract fenced code blocks from a QMD string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>text</strong> – Full .qmd text.</p></li>
+<li><p><strong>file</strong> – Path to the file (for metadata only).</p></li>
+<li><p><strong>lang</strong> – If not None, only blocks with this language (case-insensitive) are
+returned. If None, all languages are returned.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parsed code block objects, in order.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list[<a class="reference internal" href="#quarto_tools.blocks.CodeBlock" title="quarto_tools.blocks.CodeBlock">CodeBlock</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-quarto_tools.cli">
+<span id="cli-module"></span><h2>CLI Module<a class="headerlink" href="#module-quarto_tools.cli" title="Link to this heading"></a></h2>
+<p>quarto_tools command line interface.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="quarto_tools.cli._run_qt_line">
+<span class="sig-prename descclassname"><span class="pre">quarto_tools.cli.</span></span><span class="sig-name descname"><span class="pre">_run_qt_line</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ctx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Context</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">line</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prog_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'qt</span> <span class="pre">uber'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/quarto_tools/cli.html#_run_qt_line"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.cli._run_qt_line" title="Link to this definition"></a></dt>
+<dd><p>Parse a single qt command line and dispatch it through the main click group.</p>
+<p>Empty lines and comment-only lines (starting with ‘#’) are ignored.
+Any click.SystemExit exceptions are caught so one bad command does not
+terminate an uber or script session.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quarto_tools.cli.qd">
+<span class="sig-prename descclassname"><span class="pre">quarto_tools.cli.</span></span><span class="sig-name descname"><span class="pre">qd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/quarto_tools/cli.html#qd"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.cli.qd" title="Link to this definition"></a></dt>
+<dd><p>click enabled suitable quick display method.</p>
+</dd></dl>
+
+</section>
+<section id="module-quarto_tools.consolidate">
+<span id="consolidate-module"></span><h2>Consolidate Module<a class="headerlink" href="#module-quarto_tools.consolidate" title="Link to this heading"></a></h2>
+<p>Consolidate a Quarto project into a single .qmd file.</p>
+<p>This tool:</p>
+<ul class="simple">
+<li><p>Discovers the .qmd sources for a project (book, website, etc.).</p></li>
+<li><p>For each source, strips its YAML front matter, extracts an optional title,
+and flattens {{&lt; include &gt;}} directives using QuartoTidy’s include logic.</p></li>
+<li><p>Assembles everything into one big .qmd file with a single YAML header
+at the top and chapter headings for each source file.</p></li>
+</ul>
+<p>By default, per-file YAML front matter is discarded apart from the title,
+which becomes a heading. Optionally, the original YAML can be preserved
+as commented blocks above each chapter.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="quarto_tools.consolidate.QuartoConsolidate">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quarto_tools.consolidate.</span></span><span class="sig-name descname"><span class="pre">QuartoConsolidate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">project_yaml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_patterns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">explicit_files</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'utf-8'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/quarto_tools/consolidate.html#QuartoConsolidate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.consolidate.QuartoConsolidate" title="Link to this definition"></a></dt>
+<dd><p>Consolidate a Quarto project into a single .qmd file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>base_dir</strong> (<em>pathlib._local.Path</em>) – Project base directory (root used by discover_quarto_sources).</p></li>
+<li><p><strong>project_yaml</strong> (<em>pathlib._local.Path</em><em> | </em><em>None</em>) – Optional _quarto.yml / _quarto.yaml path if already known.</p></li>
+<li><p><strong>file_patterns</strong> (<em>tuple</em><em>[</em><em>str</em><em>, </em><em>...</em><em>]</em>) – Optional glob patterns to filter sources; usually empty for
+book-style projects driven by the project YAML.</p></li>
+<li><p><strong>explicit_files</strong> (<em>tuple</em><em>[</em><em>pathlib._local.Path</em><em>, </em><em>...</em><em>]</em>) – Optional explicit list of source files; if non-empty, used in
+preference to project YAML and patterns.</p></li>
+<li><p><strong>encoding</strong> (<em>str</em>) – Text encoding for reading and writing files.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.consolidate.QuartoConsolidate._extract_title">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_extract_title</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">front</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/quarto_tools/consolidate.html#QuartoConsolidate._extract_title"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.consolidate.QuartoConsolidate._extract_title" title="Link to this definition"></a></dt>
+<dd><p>Extract a ‘title: …’ value from a front-matter block.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.consolidate.QuartoConsolidate._strip_leading_blank_lines">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_strip_leading_blank_lines</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lines</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/consolidate.html#QuartoConsolidate._strip_leading_blank_lines"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.consolidate.QuartoConsolidate._strip_leading_blank_lines" title="Link to this definition"></a></dt>
+<dd><p>Remove leading blank lines from a list of lines.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.consolidate.QuartoConsolidate.consolidate">
+<span class="sig-name descname"><span class="pre">consolidate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">output_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comment_front_matter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">heading_level</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Path</span></span></span><a class="reference internal" href="_modules/quarto_tools/consolidate.html#QuartoConsolidate.consolidate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.consolidate.QuartoConsolidate.consolidate" title="Link to this definition"></a></dt>
+<dd><p>Consolidate the project into a single .qmd file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>output_path</strong> – Destination .qmd file; parent directories are created if needed.</p></li>
+<li><p><strong>comment_front_matter</strong> – If True, preserve each file’s YAML front matter as a commented
+block above the corresponding chapter heading.</p></li>
+<li><p><strong>heading_level</strong> – Heading level for chapter titles extracted from front matter
+(1 → ‘#’, 2 → ‘##’, etc).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The output_path, for convenience.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Path</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-quarto_tools.pytest_qmd">
+<span id="pytest-qmd-module"></span><h2>PyTest_qmd Module<a class="headerlink" href="#module-quarto_tools.pytest_qmd" title="Link to this heading"></a></h2>
+<p>Python extraction and testing for Quarto .qmd files.</p>
+<p>This module is independent of tidy/xref/bibtex functionality. It provides:</p>
+<ul class="simple">
+<li><p>collect_blocks: enumerate python code blocks</p></li>
+<li><p>extract: write them to .py files (one per .qmd)</p></li>
+<li><p>run: syntax-test or execute blocks, optionally in parallel via subprocesses</p></li>
+</ul>
+<p>The CLI layer should handle user interaction and pretty printing; this module
+focuses on data and results.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="quarto_tools.pytest_qmd.QuartoPyTest">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quarto_tools.pytest_qmd.</span></span><span class="sig-name descname"><span class="pre">QuartoPyTest</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">project_yaml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_patterns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">explicit_files</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'utf-8'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/quarto_tools/pytest_qmd.html#QuartoPyTest"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.pytest_qmd.QuartoPyTest" title="Link to this definition"></a></dt>
+<dd><p>Extract and test Python code blocks from Quarto .qmd files.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>base_dir</strong> (<em>pathlib._local.Path</em>) – Root directory for the project.</p></li>
+<li><p><strong>project_yaml</strong> (<em>pathlib._local.Path</em><em> | </em><em>None</em>) – Optional path to project-level _quarto.yml / _quarto.yaml.</p></li>
+<li><p><strong>file_patterns</strong> (<em>tuple</em><em>[</em><em>str</em><em>, </em><em>...</em><em>]</em>) – Glob patterns for source discovery (ripgrep -g style).</p></li>
+<li><p><strong>explicit_files</strong> (<em>tuple</em><em>[</em><em>pathlib._local.Path</em><em>, </em><em>...</em><em>]</em>) – Explicitly provided .qmd files. If non-empty, take precedence over
+patterns and project yaml.</p></li>
+<li><p><strong>encoding</strong> (<em>str</em>) – Text encoding for reading .qmd files.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.pytest_qmd.QuartoPyTest._collect_block_objects">
+<span class="sig-name descname"><span class="pre">_collect_block_objects</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#quarto_tools.blocks.CodeBlock" title="quarto_tools.blocks.CodeBlock"><span class="pre">CodeBlock</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/pytest_qmd.html#QuartoPyTest._collect_block_objects"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.pytest_qmd.QuartoPyTest._collect_block_objects" title="Link to this definition"></a></dt>
+<dd><p>Collect CodeBlock objects for all python code blocks in the project.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list[<a class="reference internal" href="#quarto_tools.blocks.CodeBlock" title="quarto_tools.blocks.CodeBlock">CodeBlock</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.pytest_qmd.QuartoPyTest._discover_sources">
+<span class="sig-name descname"><span class="pre">_discover_sources</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/pytest_qmd.html#QuartoPyTest._discover_sources"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.pytest_qmd.QuartoPyTest._discover_sources" title="Link to this definition"></a></dt>
+<dd><p>Discover .qmd files using the shared project-discovery logic.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Source files in project order.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>list[Path]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.pytest_qmd.QuartoPyTest._run_script_worker">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_run_script_worker</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">queue</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Queue</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">results</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/quarto_tools/pytest_qmd.html#QuartoPyTest._run_script_worker"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.pytest_qmd.QuartoPyTest._run_script_worker" title="Link to this definition"></a></dt>
+<dd><p>Async worker: run ipython script.py for queued scripts.</p>
+<p>Results are stored in the shared ‘results’ dict keyed by script path.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.pytest_qmd.QuartoPyTest._run_scripts_parallel">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_run_scripts_parallel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">scripts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_workers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/pytest_qmd.html#QuartoPyTest._run_scripts_parallel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.pytest_qmd.QuartoPyTest._run_scripts_parallel" title="Link to this definition"></a></dt>
+<dd><p>Run scripts in parallel using asyncio subprocesses.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>scripts</strong> – List of script paths to run with ipython.</p></li>
+<li><p><strong>n_workers</strong> – Number of concurrent workers.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Mapping script path -&gt; result dict (currently only ‘returncode’).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.pytest_qmd.QuartoPyTest.collect_blocks">
+<span class="sig-name descname"><span class="pre">collect_blocks</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/quarto_tools/pytest_qmd.html#QuartoPyTest.collect_blocks"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.pytest_qmd.QuartoPyTest.collect_blocks" title="Link to this definition"></a></dt>
+<dd><p>Return a DataFrame of all Python code blocks across the project.</p>
+<section id="columns">
+<h3>Columns<a class="headerlink" href="#columns" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>file :</dt><dd><p>Path to the .qmd file, relative to base_dir.</p>
+</dd>
+<dt>block_index :</dt><dd><p>1-based index of the block within the file.</p>
+</dd>
+<dt>lang :</dt><dd><p>Language in the fence (always “python” here).</p>
+</dd>
+<dt>label :</dt><dd><p>Optional #| label: value.</p>
+</dd>
+<dt>caption :</dt><dd><p>Optional #| …-cap: text.</p>
+</dd>
+<dt>start_line :</dt><dd><p>Starting line number of the code in the file (1-based).</p>
+</dd>
+<dt>end_line :</dt><dd><p>Ending line number of the code in the file (1-based).</p>
+</dd>
+<dt>code :</dt><dd><p>The block source code.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.pytest_qmd.QuartoPyTest.extract">
+<span class="sig-name descname"><span class="pre">extract</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">output_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/quarto_tools/pytest_qmd.html#QuartoPyTest.extract"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.pytest_qmd.QuartoPyTest.extract" title="Link to this definition"></a></dt>
+<dd><p>Extract Python blocks into .py files, one per source .qmd file.</p>
+<p>For each .qmd file containing at least one python block, a .py file
+is written under output_dir with a mirrored directory structure.
+The .py file name is the same as the .qmd stem, with suffix .py.</p>
+<p>Each block is separated by a comment header indicating its index,
+label, and caption where available.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>output_dir</strong> – Destination directory for the extracted .py files.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p>Summary with columns:</p>
+<ul class="simple">
+<li><p>file: original .qmd path, relative to base_dir</p></li>
+<li><p>py_file: generated .py path, relative to output_dir</p></li>
+<li><p>blocks: number of blocks written</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pandas.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.pytest_qmd.QuartoPyTest.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'syntax'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/quarto_tools/pytest_qmd.html#QuartoPyTest.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.pytest_qmd.QuartoPyTest.run" title="Link to this definition"></a></dt>
+<dd><p>Test Python code blocks in a single process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>mode</strong> – <p>Either “syntax” or “exec”.</p>
+<ul class="simple">
+<li><p>”syntax”: only compile each block with compile(…, ‘exec’).
+No code is executed; this checks for SyntaxError only.</p></li>
+<li><p>”exec”: execute each block in an IPython InteractiveShell
+instance with matplotlib using the “Agg” backend.</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p>One row per block with columns:</p>
+<ul class="simple">
+<li><p>file: .qmd path relative to base_dir</p></li>
+<li><p>block_index</p></li>
+<li><p>label</p></li>
+<li><p>mode</p></li>
+<li><p>ok: True if compile/exec succeeded, False otherwise</p></li>
+<li><p>error_type: exception class name (or None)</p></li>
+<li><p>error_message: string message (or None)</p></li>
+<li><p>lineno: error line number within the block, if available</p></li>
+<li><p>col_offset: error column offset, if available</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pandas.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.pytest_qmd.QuartoPyTest.run_parallel">
+<span class="sig-name descname"><span class="pre">run_parallel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">output_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_workers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">4</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/quarto_tools/pytest_qmd.html#QuartoPyTest.run_parallel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.pytest_qmd.QuartoPyTest.run_parallel" title="Link to this definition"></a></dt>
+<dd><p>Execute chapters in parallel as independent scripts.</p>
+<p>This mode:
+- extracts one .py per .qmd with python blocks,
+- runs <cite>ipython chapter.py</cite> in parallel,
+- writes .output/.stderr/.error files per chapter,
+- maps the chapter result back to all its blocks.</p>
+<p>It does NOT tell you which specific block failed, only that the
+chapter script as a whole succeeded or failed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>output_dir</strong> – Directory to write the extracted .py scripts.
+If None, use base_dir / “.qpytest”.</p></li>
+<li><p><strong>n_workers</strong> – Number of concurrent workers.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p>One row per block with columns:</p>
+<ul class="simple">
+<li><p>file: .qmd path relative to base_dir</p></li>
+<li><p>block_index</p></li>
+<li><p>label</p></li>
+<li><p>mode: “exec-parallel”</p></li>
+<li><p>ok: True if the chapter script exit code was 0</p></li>
+<li><p>error_type: None or “SubprocessError”</p></li>
+<li><p>error_message: message including the return code</p></li>
+<li><p>lineno, col_offset: always None (no block-level info here)</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pandas.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-quarto_tools.tidy">
+<span id="tidy-module"></span><h2>Tidy Module<a class="headerlink" href="#module-quarto_tools.tidy" title="Link to this heading"></a></h2>
+<p>Tidy, normalize, and report on Quarto .qmd files.</p>
+<p>This includes:
+- Flattening {{&lt; include &gt;}} directives.
+- Normalizing paragraphs, spacing, and comments.
+- Reporting: xrefs, citations, python-block inventory.</p>
+<p>Python execution is intentionally not handled here. That lives in
+pytest_qmd.py as QuartoPyTest.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="quarto_tools.tidy.QuartoTidy">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quarto_tools.tidy.</span></span><span class="sig-name descname"><span class="pre">QuartoTidy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">project_yaml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_patterns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">explicit_files</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'utf-8'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/quarto_tools/tidy.html#QuartoTidy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.tidy.QuartoTidy" title="Link to this definition"></a></dt>
+<dd><p>Project-level tidying and reporting for Quarto .qmd files.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="quarto_tools.tidy.QuartoTidy.base_dir">
+<span class="sig-name descname"><span class="pre">base_dir</span></span><a class="headerlink" href="#quarto_tools.tidy.QuartoTidy.base_dir" title="Link to this definition"></a></dt>
+<dd><p>Root directory for the project.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pathlib._local.Path</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="quarto_tools.tidy.QuartoTidy.project_yaml">
+<span class="sig-name descname"><span class="pre">project_yaml</span></span><a class="headerlink" href="#quarto_tools.tidy.QuartoTidy.project_yaml" title="Link to this definition"></a></dt>
+<dd><p>Path to project-level _quarto.yml (optional).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pathlib._local.Path | None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="quarto_tools.tidy.QuartoTidy.file_patterns">
+<span class="sig-name descname"><span class="pre">file_patterns</span></span><a class="headerlink" href="#quarto_tools.tidy.QuartoTidy.file_patterns" title="Link to this definition"></a></dt>
+<dd><p>Glob patterns for source discovery.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple[str, …]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="quarto_tools.tidy.QuartoTidy.explicit_files">
+<span class="sig-name descname"><span class="pre">explicit_files</span></span><a class="headerlink" href="#quarto_tools.tidy.QuartoTidy.explicit_files" title="Link to this definition"></a></dt>
+<dd><p>Explicitly provided files.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple[pathlib._local.Path, …]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="quarto_tools.tidy.QuartoTidy.encoding">
+<span class="sig-name descname"><span class="pre">encoding</span></span><a class="headerlink" href="#quarto_tools.tidy.QuartoTidy.encoding" title="Link to this definition"></a></dt>
+<dd><p>Text encoding for reading files.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.tidy.QuartoTidy._discover_sources">
+<span class="sig-name descname"><span class="pre">_discover_sources</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/tidy.html#QuartoTidy._discover_sources"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.tidy.QuartoTidy._discover_sources" title="Link to this definition"></a></dt>
+<dd><p>Discover .qmd files using the same logic as TOC/XREF/BIBTEX.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.tidy.QuartoTidy._flatten_body">
+<span class="sig-name descname"><span class="pre">_flatten_body</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recursive</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_include_markers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">visited</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">set</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/tidy.html#QuartoTidy._flatten_body"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.tidy.QuartoTidy._flatten_body" title="Link to this definition"></a></dt>
+<dd><p>Recursively expand include directives for the body of a file.</p>
+<p>The front matter of included files is stripped; only their bodies
+contribute to the output.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.tidy.QuartoTidy._split_front_matter">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_split_front_matter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/tidy.html#QuartoTidy._split_front_matter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.tidy.QuartoTidy._split_front_matter" title="Link to this definition"></a></dt>
+<dd><p>Split a QMD file into (front_matter_lines, body_lines).</p>
+<p>The front matter, if present, is assumed to be a YAML block starting
+at the first line with ‘—’ and ending at the next line that is
+exactly ‘—’. If no such block exists at the top of the file, the
+front matter list is empty and the body is the full file.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.tidy.QuartoTidy._tidy_body_lines">
+<span class="sig-name descname"><span class="pre">_tidy_body_lines</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">body_lines</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove_comments</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wrap_width</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/tidy.html#QuartoTidy._tidy_body_lines"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.tidy.QuartoTidy._tidy_body_lines" title="Link to this definition"></a></dt>
+<dd><p>Tidy only the body (no YAML front matter).</p>
+<dl class="simple">
+<dt>This function:</dt><dd><ul class="simple">
+<li><p>normalizes blank lines outside code fences,</p></li>
+<li><p>optionally removes HTML comments,</p></li>
+<li><p>optionally wraps paragraphs to a target width,</p></li>
+<li><p>leaves fenced code blocks untouched.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.tidy.QuartoTidy.flatten_file">
+<span class="sig-name descname"><span class="pre">flatten_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">main_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recursive</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_include_markers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Path</span></span></span><a class="reference internal" href="_modules/quarto_tools/tidy.html#QuartoTidy.flatten_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.tidy.QuartoTidy.flatten_file" title="Link to this definition"></a></dt>
+<dd><p>Flatten {{&lt; include &gt;}} directives in a Quarto file.</p>
+<p>Consider: add flatten_project.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>main_file</strong> – The root .qmd file (absolute or relative to base_dir).</p></li>
+<li><p><strong>output_path</strong> – Destination .qmd file.</p></li>
+<li><p><strong>recursive</strong> – If True, includes inside included files are also expanded.</p></li>
+<li><p><strong>keep_include_markers</strong> – If True, leave commented markers where each include occurred.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The path to the written flattened file.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Path</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.tidy.QuartoTidy.report">
+<span class="sig-name descname"><span class="pre">report</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">include_xrefs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_bibtex</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_python</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/tidy.html#QuartoTidy.report"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.tidy.QuartoTidy.report" title="Link to this definition"></a></dt>
+<dd><p>Generate a project report: xrefs, citations, python blocks.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>include_xrefs</strong> – Include cross-reference validation.</p></li>
+<li><p><strong>include_bibtex</strong> – Include citation / bibtex analysis.</p></li>
+<li><p><strong>include_python</strong> – Include python-block inventory.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Results keyed by ‘xrefs’, ‘bibtex’, ‘python’.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.tidy.QuartoTidy.tidy">
+<span class="sig-name descname"><span class="pre">tidy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">in_place</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove_comments</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wrap_width</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/quarto_tools/tidy.html#QuartoTidy.tidy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.tidy.QuartoTidy.tidy" title="Link to this definition"></a></dt>
+<dd><p>Normalize formatting of .qmd files.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>in_place</strong> – If True, modify files directly.</p></li>
+<li><p><strong>output_dir</strong> – If provided and in_place is False, write tidied files here with
+mirrored directory structure.</p></li>
+<li><p><strong>remove_comments</strong> – Remove HTML comments &lt;!– … –&gt; outside code fences.</p></li>
+<li><p><strong>wrap_width</strong> – If provided, wrap prose paragraphs to this width.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Summary with columns: file, changed, lines_before, lines_after.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pandas.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-quarto_tools.toc">
+<span id="toc-module"></span><h2>TOC Module<a class="headerlink" href="#module-quarto_tools.toc" title="Link to this heading"></a></h2>
+<p>Create TikZ Table of Contents from a Quarto project, with:
+- copious debug comments and whitespace for readability,
+- chapter header baseline alignment,
+- look-ahead chapter cache to decide row wrapping by remaining column capacity.</p>
+<dl class="simple">
+<dt>Windows usage (example):</dt><dd><p>python -m quarto_tools.toc C:pathtoquartoproject C:outtoc.tex</p>
+</dd>
+</dl>
+<dl class="py class">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quarto_tools.toc.</span></span><span class="sig-name descname"><span class="pre">QuartoToc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_levels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">up_level</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">omit_titles</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">set</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chapter_min_height</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'auto'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">section_max_height</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'6cm'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_columns_per_row</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">balance_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'stable'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title_gap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'4mm'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">section_top_gap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'1.5mm'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">column_width</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'5cm'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">column_gap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'3mm'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">section_column_gap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'3mm'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">row_gap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'5mm'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title_col</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'title'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chapter_col</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'chapter'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">section_col</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'section'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subsection_col</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'subsection'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chars_per_cm_title</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">7.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chars_per_cm_subs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">8.8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">baseline_large_pt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">14.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">baseline_norm_pt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">12.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">baseline_subs_pt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">8.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subs_linespread</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">top_prefix_lines</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">padding_pt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">8.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gap_pt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inner_sep_section_pt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">6.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'utf-8'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trust_tex</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">project_yaml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_patterns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">explicit_files</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_yaml_title_as_chapter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc" title="Link to this definition"></a></dt>
+<dd><p>Build a five-level TikZ TOC from a Quarto project or file.</p>
+<dl class="simple">
+<dt>Levels:</dt><dd><ul class="simple">
+<li><p>Title: large bold title on top left of page; with date time stamp and github info if available</p></li>
+<li><p>Chapters: bold, shaded box at top of each column, with ch #</p></li>
+<li><p>Sections: ch.sec Numbered, roman font</p></li>
+<li><p>Subsections: bulleted separated paragraph below section</p></li>
+<li><p>Subsubsection: comma separated list within parenthesis within subsections</p></li>
+</ul>
+</dd>
+<dt>Key features:</dt><dd><ul class="simple">
+<li><p>Baseline-aligned chapter headers (anchor=base west; chapter→chapter chaining via .base east).</p></li>
+<li><p>Subsection balancing into subcolumns by height.</p></li>
+<li><p>Look-ahead chapter cache to decide row wrapping by remaining subcolumn capacity.</p></li>
+<li><p>Optional verbose debug mode that emits clear LaTeX comments and structure.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>base_dir</strong> – Root Quarto directory or single .qmd/.qmd-tree to parse.</p></li>
+<li><p><strong>max_levels</strong> – Maximum heading depth to include. -1 means full depth; 1 gives
+chapters only; 2 gives chapters and sections; etc.</p></li>
+<li><p><strong>up_level</strong> – If true, promote the highest heading level found so that (for
+example) ### becomes a chapter level.</p></li>
+<li><p><strong>omit_titles</strong> – Set of titles to exclude when building the TOC.</p></li>
+<li><p><strong>chapter_min_height</strong> – Minimum height of the chapter header box; “auto” computes a value
+based on title length.</p></li>
+<li><p><strong>section_max_height</strong> – Maximum height of a section subcolumn (e.g., “6cm”). Sections wrap
+across subcolumns when this cap is exceeded.</p></li>
+<li><p><strong>max_columns_per_row</strong> – Total subcolumn capacity per row before forcing a wrap.</p></li>
+<li><p><strong>balance_mode</strong> – Subcolumn packing rule: “stable” respects document order; “ffd”
+uses first-fit decreasing by estimated height.</p></li>
+<li><p><strong>title_gap</strong> – Vertical gap between the title bar and the first row of chapters.</p></li>
+<li><p><strong>section_top_gap</strong> – Vertical gap between a chapter header and the first section node.</p></li>
+<li><p><strong>column_width</strong> – Width of each chapter column.</p></li>
+<li><p><strong>column_gap</strong> – Horizontal gap between chapter groups.</p></li>
+<li><p><strong>section_column_gap</strong> – Horizontal gap between section subcolumns within one chapter.</p></li>
+<li><p><strong>row_gap</strong> – Vertical gap between rows.</p></li>
+<li><p><strong>title_col</strong> – DataFrame column names used during parsing and layout.</p></li>
+<li><p><strong>chapter_col</strong> – DataFrame column names used during parsing and layout.</p></li>
+<li><p><strong>section_col</strong> – DataFrame column names used during parsing and layout.</p></li>
+<li><p><strong>subsection_col</strong> – DataFrame column names used during parsing and layout.</p></li>
+<li><p><strong>chars_per_cm_title</strong> – Heuristics used to estimate line counts in title and subsection
+text.</p></li>
+<li><p><strong>chars_per_cm_subs</strong> – Heuristics used to estimate line counts in title and subsection
+text.</p></li>
+<li><p><strong>baseline_large_pt</strong> – Baseline skips (in points) for chapter headers, section titles,
+and subsections.</p></li>
+<li><p><strong>baseline_norm_pt</strong> – Baseline skips (in points) for chapter headers, section titles,
+and subsections.</p></li>
+<li><p><strong>baseline_subs_pt</strong> – Baseline skips (in points) for chapter headers, section titles,
+and subsections.</p></li>
+<li><p><strong>subs_linespread</strong> – Multiplicative line spacing used for subsection text.</p></li>
+<li><p><strong>top_prefix_lines</strong> – Number of prefix lines reserved in the chapter header (e.g., “Ch NN”).</p></li>
+<li><p><strong>padding_pt</strong> – Inner padding around chapter header nodes.</p></li>
+<li><p><strong>gap_pt</strong> – Vertical gap between section title and subsection block.</p></li>
+<li><p><strong>inner_sep_section_pt</strong> – Inner padding for section nodes.</p></li>
+<li><p><strong>encoding</strong> – File-reading encoding.</p></li>
+<li><p><strong>trust_tex</strong> – If true, skip escaping LaTeX specials and trust the input text.</p></li>
+<li><p><strong>debug</strong> – If true, emit LaTeX comments and light node outlines to help visualize
+layout and alignment.</p></li>
+<li><p><strong>project_yaml</strong> – Explicit _quarto.yml / .yaml, if not under base_dir</p></li>
+<li><p><strong>file_patterns</strong> – Glob patterns relative to base_dir (e.g., (”<em>.qmd”, “posts/</em>.qmd”))</p></li>
+<li><p><strong>explicit_files</strong> – Explicit QMD files; takes precedence over patterns/project_yaml</p></li>
+<li><p><strong>use_yaml_title_as_chapter</strong> – If no level-1 heading in a file, use its front-matter title as a synthetic chapter</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc._cm_from">
+<span class="sig-name descname"><span class="pre">_cm_from</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_cm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc._cm_from"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc._cm_from" title="Link to this definition"></a></dt>
+<dd><p>Parse ‘&lt;num&gt;cm’ or ‘&lt;num&gt;mm’ into centimeters; fallback to default_cm.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc._columns_by_height">
+<span class="sig-name descname"><span class="pre">_columns_by_height</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">items</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cap_cm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'stable'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc._columns_by_height"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc._columns_by_height" title="Link to this definition"></a></dt>
+<dd><p>Partition (sec_val, node_text, est_h_cm, order_idx) into subcolumns.</p>
+<dl class="simple">
+<dt>mode:</dt><dd><ul class="simple">
+<li><p>“stable”: keep original order; wrap to next column when cap exceeded.</p></li>
+<li><p>“ffd”:    first-fit decreasing by height, then restore original order within each column.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc._compute_chapter_layout">
+<span class="sig-name descname"><span class="pre">_compute_chapter_layout</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ch_idx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ch_df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chapter_number</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc._compute_chapter_layout"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc._compute_chapter_layout" title="Link to this definition"></a></dt>
+<dd><dl class="simple">
+<dt>Compute and cache a chapter’s:</dt><dd><ul class="simple">
+<li><p>chapter header text,</p></li>
+<li><p>per-section display text and height estimates,</p></li>
+<li><p>subcolumn packing and ‘slots’ needed,</p></li>
+<li><p>stable names for nodes to refer to during emission.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc._escape_latex">
+<span class="sig-name descname"><span class="pre">_escape_latex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">object</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc._escape_latex"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc._escape_latex" title="Link to this definition"></a></dt>
+<dd><p>Escape LaTeX specials for safe node text.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc._estimate_chapter_min_height_cm">
+<span class="sig-name descname"><span class="pre">_estimate_chapter_min_height_cm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">titles</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc._estimate_chapter_min_height_cm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc._estimate_chapter_min_height_cm" title="Link to this definition"></a></dt>
+<dd><p>Estimate min-height for large chapter nodes and return as ‘&lt;X&gt;cm’.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc._estimate_lines">
+<span class="sig-name descname"><span class="pre">_estimate_lines</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width_cm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chars_per_cm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc._estimate_lines"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc._estimate_lines" title="Link to this definition"></a></dt>
+<dd><p>Rough line-count estimator given width and average characters per cm.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc._estimate_section_height_cm">
+<span class="sig-name descname"><span class="pre">_estimate_section_height_cm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sec_title</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subs_text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width_cm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc._estimate_section_height_cm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc._estimate_section_height_cm" title="Link to this definition"></a></dt>
+<dd><p>Rough section-node height estimate in cm, combining title and inline subsections.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc._markdown_to_tex">
+<span class="sig-name descname"><span class="pre">_markdown_to_tex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc._markdown_to_tex"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc._markdown_to_tex" title="Link to this definition"></a></dt>
+<dd><dl class="simple">
+<dt>Convert minimal Markdown syntax to TeX equivalents for headings:</dt><dd><p><strong>bold</strong> → textbf{…}
+<em>italic</em> or _italic_ → textit{…}
+<cite>code</cite> → texttt{…}</p>
+</dd>
+</dl>
+<p>Leaves existing TeX ($…$, mathsf{}, etc.) untouched.
+Escapes only dangerous specials outside math mode.</p>
+<p>This is quite tricky! The protect_math stores math in a dict,
+then adjusts, then puts back.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc._now_iso">
+<span class="sig-name descname"><span class="pre">_now_iso</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc._now_iso"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc._now_iso" title="Link to this definition"></a></dt>
+<dd><p>Current local datetime formatted as ISO ‘YYYY-MM-DD HH:MM:SS’.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc._original_make_df">
+<span class="sig-name descname"><span class="pre">_original_make_df</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc._original_make_df"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc._original_make_df" title="Link to this definition"></a></dt>
+<dd><p>Extract headings levels 1..4 from a Quarto project.
+Applies omit_titles, computes chapter/section/subsection counters.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc._parse_file">
+<span class="sig-name descname"><span class="pre">_parse_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc._parse_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc._parse_file" title="Link to this definition"></a></dt>
+<dd><dl class="simple">
+<dt>Parse a single QMD file:</dt><dd><ul class="simple">
+<li><p>extract optional front-matter title,</p></li>
+<li><p>collect headings (raw level, title, refs, order_in_file) from body.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc._safe_save">
+<span class="sig-name descname"><span class="pre">_safe_save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc._safe_save"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc._safe_save" title="Link to this definition"></a></dt>
+<dd><p>Ensure parent dir exists and write UTF-8 text.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc._wrap_tikz_to_tex">
+<span class="sig-name descname"><span class="pre">_wrap_tikz_to_tex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tikz</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc._wrap_tikz_to_tex"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc._wrap_tikz_to_tex" title="Link to this definition"></a></dt>
+<dd><p>Wrap the TikZ picture into a minimal standalone LuaLaTeX document,
+with a top title bar: left = self.title, right = ISO datetime on top,
+and ‘commit — state’ beneath, flush right.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc.make_df">
+<span class="sig-name descname"><span class="pre">make_df</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc.make_df"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc.make_df" title="Link to this definition"></a></dt>
+<dd><p>Extract headings from Quarto sources and build the layout DataFrame.</p>
+<dl class="simple">
+<dt>Sources can come from:</dt><dd><ul class="simple">
+<li><p>a Quarto project YAML (_quarto.yml / _quarto.yaml),</p></li>
+<li><p>one or more explicit .qmd files,</p></li>
+<li><p>glob patterns under base_dir.</p></li>
+</ul>
+</dd>
+</dl>
+<p>Applies omit_titles and computes chapter/section/subsection counters,
+including:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>optional “up-level” of files with no level-1 headings, and</p></li>
+<li><p>optional synthetic chapter rows from per-file YAML titles.</p></li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc.make_tikz_toc">
+<span class="sig-name descname"><span class="pre">make_tikz_toc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chapter_number</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc.make_tikz_toc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc.make_tikz_toc" title="Link to this definition"></a></dt>
+<dd><p>Create a TikZ picture of the TOC with baseline-aligned chapter headers
+and look-ahead row wrapping by subcolumn capacity.</p>
+<p>If chapter_number &gt; 0 then up-level everything to produce a
+more detailed table for that chapter.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc.run_lualatex">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">run_lualatex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tex_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc.run_lualatex"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc.run_lualatex" title="Link to this definition"></a></dt>
+<dd><p>Run lualatex on tex_path and stream stdout/stderr.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc.write_tex">
+<span class="sig-name descname"><span class="pre">write_tex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chapter_number</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc.write_tex"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc.write_tex" title="Link to this definition"></a></dt>
+<dd><p>Wrap the TikZ picture into a standalone LuaLaTeX document and save.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.toc.QuartoToc.write_tikz">
+<span class="sig-name descname"><span class="pre">write_tikz</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">out_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chapter_number</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/quarto_tools/toc.html#QuartoToc.write_tikz"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.toc.QuartoToc.write_tikz" title="Link to this definition"></a></dt>
+<dd><p>Write bare TikZ code to a .tex snippet file.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-quarto_tools.utils">
+<span id="utils-module"></span><h2>Utils Module<a class="headerlink" href="#module-quarto_tools.utils" title="Link to this heading"></a></h2>
+<p>Shared utilities for quarto_tools.</p>
+<p>This module provides functions for:</p>
+<ul class="simple">
+<li><p>Discovering Quarto project sources (qmd files) in the correct order.</p></li>
+<li><p>Extracting YAML front matter and body from .qmd files.</p></li>
+<li><p>Stripping code blocks and comments from lines for text-only processing.</p></li>
+</ul>
+<dl class="py function">
+<dt class="sig sig-object py" id="quarto_tools.utils.discover_quarto_sources">
+<span class="sig-prename descclassname"><span class="pre">quarto_tools.utils.</span></span><span class="sig-name descname"><span class="pre">discover_quarto_sources</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'utf-8'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">project_yaml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_patterns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">explicit_files</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/utils.html#discover_quarto_sources"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.utils.discover_quarto_sources" title="Link to this definition"></a></dt>
+<dd><p>Discover Quarto source files for a project.</p>
+<dl class="simple">
+<dt>Precedence:</dt><dd><ol class="arabic simple">
+<li><p>explicit_files (if non-empty),</p></li>
+<li><p>file_patterns (globs under base_dir),</p></li>
+<li><p>project_yaml or auto-detected _quarto.(yml|yaml) with chapters/includes.</p></li>
+</ol>
+</dd>
+<dt>Returns a pair (sources, project_title) where:</dt><dd><ul class="simple">
+<li><p>sources is a list of .qmd files in document order,</p></li>
+<li><p>project_title is the project title if found in _quarto.(yml|yaml), else None.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quarto_tools.utils.extract_front_matter">
+<span class="sig-prename descclassname"><span class="pre">quarto_tools.utils.</span></span><span class="sig-name descname"><span class="pre">extract_front_matter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/utils.html#extract_front_matter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.utils.extract_front_matter" title="Link to this definition"></a></dt>
+<dd><p>Extract YAML front matter and return (doc_title, body_lines, meta_dict).</p>
+<p>If the file does not start with ‘—’ on the first line, there is no
+front matter, doc_title is None, body_lines is the full file, and
+meta_dict is empty.</p>
+<p>The parser is intentionally minimal and only understands a small subset
+of YAML:</p>
+<blockquote>
+<div><ul>
+<li><p>‘title: …’ as a single-line string.</p></li>
+<li><p>‘bibliography: something.bib’</p></li>
+<li><p>‘bibliography: [a.bib, b.bib]’</p></li>
+<li><p>multi-line lists:</p>
+<blockquote>
+<div><dl class="simple">
+<dt>bibliography:</dt><dd><ul class="simple">
+<li><p>a.bib</p></li>
+<li><p>b.bib</p></li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quarto_tools.utils.git_info">
+<span class="sig-prename descclassname"><span class="pre">quarto_tools.utils.</span></span><span class="sig-name descname"><span class="pre">git_info</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/utils.html#git_info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.utils.git_info" title="Link to this definition"></a></dt>
+<dd><p>Return (commit_short, state) for the repo at base_dir.
+commit_short is like ‘a1b2c3d’; state is ‘clean’ or ‘dirty’.
+Falls back to (‘no-git’, ‘n/a’) if not a git repo or git unavailable.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quarto_tools.utils.resolve_quarto_context">
+<span class="sig-prename descclassname"><span class="pre">quarto_tools.utils.</span></span><span class="sig-name descname"><span class="pre">resolve_quarto_context</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">explicit_files</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_patterns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/utils.html#resolve_quarto_context"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.utils.resolve_quarto_context" title="Link to this definition"></a></dt>
+<dd><p>Resolve INPUT_PATH into a canonical Quarto project context.</p>
+<p>Used only in CLI!</p>
+<p>This function centralizes all path/YAML discovery rules used by the
+quarto_tools CLI (tidy, toc, xref, bibtex, pytest).  All commands should
+use this function so that project discovery behaves consistently.</p>
+<p>INPUT_PATH may refer to any of the following:</p>
+<blockquote>
+<div><ol class="upperalpha">
+<li><p>A directory containing a _quarto.yml or _quarto.yaml file.
+→ Treated as a Quarto project root.
+→ All project files (chapters, posts, etc.) are discovered using</p>
+<blockquote>
+<div><p>the YAML file.  file_patterns and explicit_files may override
+this if provided.</p>
+</div></blockquote>
+</li>
+<li><p>A directory without a Quarto YAML file.
+→ Treated as a generic folder of .qmd files.
+→ Discovery falls back to file_patterns (glob-like) or, if none</p>
+<blockquote>
+<div><p>are supplied, to the default “all .qmd files under directory”.</p>
+</div></blockquote>
+<p>→ explicit_files may override this.</p>
+</li>
+<li><p>A single .qmd file.
+→ Treated as a one-file “project”.
+→ base_dir is set to the file’s parent.
+→ project_yaml is None.
+→ Unless explicit_files is already given, the .qmd file becomes</p>
+<blockquote>
+<div><p>the only explicit source file and patterns are ignored.</p>
+</div></blockquote>
+</li>
+<li><p>A standalone _quarto.yml / _quarto.yaml file.
+→ Treated as the project YAML for its parent directory.
+→ This behaves like case (A) except discovery is forced to use</p>
+<blockquote>
+<div><p>this YAML file (even if the directory contains multiple YAMLs).</p>
+</div></blockquote>
+</li>
+<li><p>Any other file-like path.
+→ Treated as an atypical case with no YAML.
+→ base_dir is input_path.parent.
+→ project_yaml = None.
+→ file_patterns governs discovery unless explicit_files overrides it.</p></li>
+</ol>
+</div></blockquote>
+<p>ORDER OF OPERATIONS (resolution algorithm):</p>
+<ol class="arabic">
+<li><dl class="simple">
+<dt>Normalize and resolve INPUT_PATH:</dt><dd><p>input_path = input_path.resolve()</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>If INPUT_PATH is a directory:</dt><dd><ol class="loweralpha simple">
+<li><p>Check for _quarto.yml/_quarto.yaml inside it.</p></li>
+<li><p>If found → project directory (case A).</p></li>
+<li><p>If not found → generic directory (case B).</p></li>
+<li><p>In either case, file_patterns and explicit_files apply normally.</p></li>
+</ol>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>If INPUT_PATH is a .qmd file (case C):</dt><dd><ol class="loweralpha simple">
+<li><p>Treat as a one-file project.</p></li>
+<li><p>base_dir = parent directory.</p></li>
+<li><p>project_yaml = None.</p></li>
+<li><p>If user did not supply explicit -f files,
+explicit_files = (input_path,), overriding patterns.</p></li>
+</ol>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>If INPUT_PATH is a YAML file (case D):</dt><dd><ol class="loweralpha simple">
+<li><p>Treat it as the project’s main YAML.</p></li>
+<li><p>base_dir = parent directory.</p></li>
+<li><p>patterns = file_patterns.</p></li>
+<li><p>explicit_files override as usual.</p></li>
+</ol>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Otherwise (case E):</dt><dd><ol class="loweralpha simple">
+<li><p>Treat INPUT_PATH as a file within a generic folder.</p></li>
+<li><p>base_dir = input_path.parent.</p></li>
+<li><p>project_yaml = None.</p></li>
+<li><p>patterns = file_patterns.</p></li>
+</ol>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Return a tuple:</dt><dd><p>(base_dir, project_yaml, final_patterns, final_explicit_files)</p>
+</dd>
+</dl>
+<p>Here final_patterns and final_explicit_files encode the correct
+forced precedence rules:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>explicit_files always override patterns;</p></li>
+<li><p>.qmd input_path without explicit_files forces a single-file
+context and ignores patterns;</p></li>
+<li><p>YAML always takes precedence for discovery unless overridden.</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ol>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><dl class="simple">
+<dt>base_dir<span class="classifier">Path</span></dt><dd><p>Directory forming the root of the discovered project.</p>
+</dd>
+<dt>project_yaml<span class="classifier">Path | None</span></dt><dd><p>The discovered/forced Quarto YAML file, if any.</p>
+</dd>
+<dt>patterns<span class="classifier">tuple[str, …]</span></dt><dd><p>Final glob patterns for discovery (possibly empty).</p>
+</dd>
+<dt>explicit_files<span class="classifier">tuple[Path, …]</span></dt><dd><p>Final explicit files to include (may be empty).  If non-empty,
+discovery must ignore patterns and YAML.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>(base_dir, project_yaml, patterns, explicit_files)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quarto_tools.utils.strip_code_blocks">
+<span class="sig-prename descclassname"><span class="pre">quarto_tools.utils.</span></span><span class="sig-name descname"><span class="pre">strip_code_blocks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lines</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/utils.html#strip_code_blocks"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.utils.strip_code_blocks" title="Link to this definition"></a></dt>
+<dd><p>Remove fenced code blocks and HTML comments from an iterable of lines.</p>
+<p>This mirrors the behavior used in the original QuartoToc parser:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Lines starting or ending fenced code blocks (<a href="#id1"><span class="problematic" id="id2">``</span></a><a href="#id3"><span class="problematic" id="id4">`</span></a>).</p></li>
+<li><p>HTML comments &lt;!– … –&gt; treated as code/comment regions.</p></li>
+</ul>
+</div></blockquote>
+<p>The parser toggles an ‘incode’ flag whenever it encounters a code/comment
+marker and drops lines while incode is True.</p>
+</dd></dl>
+
+</section>
+<section id="module-quarto_tools.xref">
+<span id="xref-module"></span><h2>XRef Module<a class="headerlink" href="#module-quarto_tools.xref" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="quarto_tools.xref.QuartoXRefs">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">quarto_tools.xref.</span></span><span class="sig-name descname"><span class="pre">QuartoXRefs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">project_yaml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_patterns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">explicit_files</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'utf-8'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allowed_prefixes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">('sec',</span> <span class="pre">'fig',</span> <span class="pre">'tbl',</span> <span class="pre">'eq',</span> <span class="pre">'ch',</span> <span class="pre">'def',</span> <span class="pre">'thm',</span> <span class="pre">'exr',</span> <span class="pre">'exm',</span> <span class="pre">'lem',</span> <span class="pre">'prp',</span> <span class="pre">'nte',</span> <span class="pre">'sol',</span> <span class="pre">'REF')</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/quarto_tools/xref.html#QuartoXRefs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.xref.QuartoXRefs" title="Link to this definition"></a></dt>
+<dd><p>Scan a Quarto project for label definitions and references.</p>
+<p>This class discovers .qmd sources using the same logic as QuartoToc,
+extracts label definitions and references, and provides basic validation.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.xref.QuartoXRefs._discover_sources">
+<span class="sig-name descname"><span class="pre">_discover_sources</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Path</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/xref.html#QuartoXRefs._discover_sources"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.xref.QuartoXRefs._discover_sources" title="Link to this definition"></a></dt>
+<dd><p>Discover .qmd sources using quarto_tools.utils.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.xref.QuartoXRefs.scan">
+<span class="sig-name descname"><span class="pre">scan</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">DataFrame</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">DataFrame</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/xref.html#QuartoXRefs.scan"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.xref.QuartoXRefs.scan" title="Link to this definition"></a></dt>
+<dd><p>Scan project sources and populate defs_df and refs_df.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="quarto_tools.xref.QuartoXRefs.validate">
+<span class="sig-name descname"><span class="pre">validate</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/xref.html#QuartoXRefs.validate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.xref.QuartoXRefs.validate" title="Link to this definition"></a></dt>
+<dd><p>Validate labels and references, returning a summary dictionary.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quarto_tools.xref._collect_header_context">
+<span class="sig-prename descclassname"><span class="pre">quarto_tools.xref.</span></span><span class="sig-name descname"><span class="pre">_collect_header_context</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lines</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/xref.html#_collect_header_context"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.xref._collect_header_context" title="Link to this definition"></a></dt>
+<dd><p>Map each line index to the nearest preceding ATX header text.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quarto_tools.xref._scan_file">
+<span class="sig-prename descclassname"><span class="pre">quarto_tools.xref.</span></span><span class="sig-name descname"><span class="pre">_scan_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'utf-8'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/xref.html#_scan_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.xref._scan_file" title="Link to this definition"></a></dt>
+<dd><p>Scan a single QMD file for label definitions and references.</p>
+<p>Returns two lists of dicts: (defs_rows, refs_rows).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quarto_tools.xref._split_prefix">
+<span class="sig-prename descclassname"><span class="pre">quarto_tools.xref.</span></span><span class="sig-name descname"><span class="pre">_split_prefix</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/quarto_tools/xref.html#_split_prefix"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.xref._split_prefix" title="Link to this definition"></a></dt>
+<dd><p>Return the prefix of a label up to the first ‘-’, ‘:’ or ‘.’.</p>
+<p>If none of these separators appear, return the full label.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="quarto_tools.xref.validate_quarto_labels">
+<span class="sig-prename descclassname"><span class="pre">quarto_tools.xref.</span></span><span class="sig-name descname"><span class="pre">validate_quarto_labels</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">defs_df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refs_df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allowed_prefixes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/quarto_tools/xref.html#validate_quarto_labels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#quarto_tools.xref.validate_quarto_labels" title="Link to this definition"></a></dt>
+<dd><p>Validate label definitions and references.</p>
+<dl class="simple">
+<dt>Returns a dictionary with:</dt><dd><ul class="simple">
+<li><p>ok: bool</p></li>
+<li><p>duplicate_labels_df: duplicated label definitions</p></li>
+<li><p>undefined_refs_df: references without a matching definition</p></li>
+<li><p>unused_defs_df: definitions never referenced</p></li>
+<li><p>prefix_stats_df: counts of prefixes and allowed/unknown flag</p></li>
+<li><p>summary_df: high-level summary of counts</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="quarto_tools" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Stephen J. Mildenhall.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

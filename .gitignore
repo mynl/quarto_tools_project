@@ -57,3 +57,4 @@ local_data/
 source/.jupyter_cache
 
  
+*.zip

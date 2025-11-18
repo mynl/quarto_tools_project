@@ -242,9 +242,6 @@ class QuartoToc:
             file_patterns=self.file_patterns,
             explicit_files=self.explicit_files,
         )
-        if project_title is not None:
-            self.title = project_title
-
         click.echo(f"Discovered {len(sources)} source file(s).")
 
         outlines: list[tuple[int, str | None, list[tuple[int, str, str | None, int]]]] = []
@@ -289,31 +286,74 @@ class QuartoToc:
         if self.omit_titles:
             df = df.query("title not in @self.omit_titles").copy()
 
-        df["chapter"] = [i - 1 for i in accumulate(df.level, lambda a, x: a + (x == 1))]
-        df["section"] = [
-            i
-            for i in accumulate(
-                df.level,
-                lambda a, x: 0 if x == 1 else a + (x == 2),
-                initial=0,
-            )
-        ][1:]
-        df["subsection"] = [
-            i
-            for i in accumulate(
-                df.level,
-                lambda a, x: 0 if x <= 2 else a + (x == 3),
-                initial=0,
-            )
-        ][1:]
-        df["subsubsection"] = [
-            i
-            for i in accumulate(
-                df.level,
-                lambda a, x: 0 if x <= 3 else a + (x == 4),
-                initial=0,
-            )
-        ][1:]
+        def _add_levels(df, initial):
+            """
+            Add the level information.
+
+            If initial==0 then the first chapter is 0 which is not printed.
+            If initial==1 then it is 1 and it is used.
+            """
+            df["chapter"] = [
+                i - 1
+                for i in accumulate(
+                    df.level,
+                    lambda a, x: a + (x == 1),
+                    initial=initial
+                    )
+                ][1:]
+            df["section"] = [
+                i
+                for i in accumulate(
+                    df.level,
+                    lambda a, x: 0 if x == 1 else a + (x == 2),
+                    initial=0,
+                )
+            ][1:]
+            df["subsection"] = [
+                i
+                for i in accumulate(
+                    df.level,
+                    lambda a, x: 0 if x <= 2 else a + (x == 3),
+                    initial=0,
+                )
+            ][1:]
+            df["subsubsection"] = [
+                i
+                for i in accumulate(
+                    df.level,
+                    lambda a, x: 0 if x <= 3 else a + (x == 4),
+                    initial=0,
+                )
+            ][1:]
+            return df
+        # is the first chapter numbered?
+        lvl, refs = df[['level','refs']].iloc[0]
+        if lvl == 1 and refs.find('unnumbered') >= 0:
+            # do not number first chapter
+            initial = 0
+        else:
+            # number the first chapter
+            initial = 1
+
+        df = _add_levels(df, initial)
+
+        if project_title is None:
+            # if no project title discovered and only one # (level == 1) item then
+            # promote it to the title
+            h1 = df.query('level == 1')
+            if len(h1) == 1:
+                h1_row = h1.index[0]
+                if h1_row > 0:
+                    print(f'WARNING: Found only 1 H1 row, but at position {h1_row} not expected 0.\nStill executing PROMOTE.')
+                self.title = self._escape_latex(df.loc[h1_row, 'title'])
+                df = df.drop(index=h1_row)
+                # promote all other levels
+                df.level = df.level - 1
+                # renumber, and start with the first chapter regardless
+                df = _add_levels(df, initial=1)
+        else:
+            # use title
+            self.title = self._escape_latex(project_title)
 
         return df
 
@@ -663,11 +703,11 @@ class QuartoToc:
         """
         Run lualatex on tex_path and stream stdout/stderr.
         """
-        subprocess.run(
+        return subprocess.run(
             ["lualatex", "-interaction=nonstopmode", str(tex_path)],
-            check=True,
+            check=False,  # does not raise error
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.PIPE,  # separate error from stdout
             text=True,
         )
 

@@ -1,0 +1,678 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>quarto_tools.tidy &mdash; quarto_tools  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            quarto_tools
+              <img src="../../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">quarto_tools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">quarto_tools.tidy</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for quarto_tools.tidy</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Tidy, normalize, and report on Quarto .qmd files.</span>
+
+<span class="sd">This includes:</span>
+<span class="sd">- Flattening {{&lt; include &gt;}} directives.</span>
+<span class="sd">- Normalizing paragraphs, spacing, and comments.</span>
+<span class="sd">- Reporting: xrefs, citations, python-block inventory.</span>
+
+<span class="sd">Python execution is intentionally not handled here. That lives in</span>
+<span class="sd">pytest_qmd.py as QuartoPyTest.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">textwrap</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover_quarto_sources</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.xref</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuartoXRefs</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.bibtex</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuartoBibTex</span><span class="p">,</span> <span class="n">parse_bibtex_text</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.blocks</span><span class="w"> </span><span class="kn">import</span> <span class="n">extract_code_blocks</span><span class="p">,</span> <span class="n">CodeBlock</span>
+
+
+<span class="n">INCLUDE_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;^\s*\{\{\&lt;\s*include\s+(?P&lt;path&gt;[^&gt;]+?)\s*\&gt;\}\}\s*$&quot;&quot;&quot;</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="QuartoTidy">
+<a class="viewcode-back" href="../../api.html#quarto_tools.tidy.QuartoTidy">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">QuartoTidy</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Project-level tidying and reporting for Quarto .qmd files.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    base_dir :</span>
+<span class="sd">        Root directory for the project.</span>
+<span class="sd">    project_yaml :</span>
+<span class="sd">        Path to project-level _quarto.yml (optional).</span>
+<span class="sd">    file_patterns :</span>
+<span class="sd">        Glob patterns for source discovery.</span>
+<span class="sd">    explicit_files :</span>
+<span class="sd">        Explicitly provided files.</span>
+<span class="sd">    encoding :</span>
+<span class="sd">        Text encoding for reading files.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">base_dir</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">project_yaml</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">file_patterns</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">explicit_files</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;utf-8&quot;</span>
+
+    <span class="n">_sources</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Path</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="nb">repr</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="c1"># ------------------------</span>
+    <span class="c1"># Internal helpers</span>
+    <span class="c1"># ------------------------</span>
+
+<div class="viewcode-block" id="QuartoTidy._discover_sources">
+<a class="viewcode-back" href="../../api.html#quarto_tools.tidy.QuartoTidy._discover_sources">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_discover_sources</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Discover .qmd files using the same logic as TOC/XREF/BIBTEX.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">discover_quarto_sources</span><span class="p">(</span>
+                <span class="n">base_dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">,</span>
+                <span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">,</span>
+                <span class="n">project_yaml</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project_yaml</span><span class="p">,</span>
+                <span class="n">file_patterns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">file_patterns</span><span class="p">,</span>
+                <span class="n">explicit_files</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">explicit_files</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span></div>
+
+
+<div class="viewcode-block" id="QuartoTidy._split_front_matter">
+<a class="viewcode-back" href="../../api.html#quarto_tools.tidy.QuartoTidy._split_front_matter">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_split_front_matter</span><span class="p">(</span><span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Split a QMD file into (front_matter_lines, body_lines).</span>
+
+<span class="sd">        The front matter, if present, is assumed to be a YAML block starting</span>
+<span class="sd">        at the first line with &#39;---&#39; and ending at the next line that is</span>
+<span class="sd">        exactly &#39;---&#39;. If no such block exists at the top of the file, the</span>
+<span class="sd">        front matter list is empty and the body is the full file.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="n">text</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">lines</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[],</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">&quot;---&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[],</span> <span class="n">lines</span>
+
+        <span class="n">end_idx</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">)):</span>
+            <span class="k">if</span> <span class="n">lines</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;---&quot;</span><span class="p">:</span>
+                <span class="n">end_idx</span> <span class="o">=</span> <span class="n">i</span>
+                <span class="k">break</span>
+
+        <span class="k">if</span> <span class="n">end_idx</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Unterminated front matter: treat whole file as body.</span>
+            <span class="k">return</span> <span class="p">[],</span> <span class="n">lines</span>
+
+        <span class="n">front</span> <span class="o">=</span> <span class="n">lines</span><span class="p">[:</span> <span class="n">end_idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">body</span> <span class="o">=</span> <span class="n">lines</span><span class="p">[</span><span class="n">end_idx</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:]</span>
+        <span class="k">return</span> <span class="n">front</span><span class="p">,</span> <span class="n">body</span></div>
+
+
+    <span class="c1"># ------------------------</span>
+    <span class="c1"># Feature 1: flatten_file</span>
+    <span class="c1"># ------------------------</span>
+
+<div class="viewcode-block" id="QuartoTidy.flatten_file">
+<a class="viewcode-back" href="../../api.html#quarto_tools.tidy.QuartoTidy.flatten_file">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">flatten_file</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">main_file</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">output_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">recursive</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">keep_include_markers</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Flatten {{&lt; include &gt;}} directives in a Quarto file.</span>
+
+<span class="sd">        Consider: add flatten_project.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        main_file :</span>
+<span class="sd">            The root .qmd file (absolute or relative to base_dir).</span>
+<span class="sd">        output_path :</span>
+<span class="sd">            Destination .qmd file.</span>
+<span class="sd">        recursive :</span>
+<span class="sd">            If True, includes inside included files are also expanded.</span>
+<span class="sd">        keep_include_markers :</span>
+<span class="sd">            If True, leave commented markers where each include occurred.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Path</span>
+<span class="sd">            The path to the written flattened file.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># originally: TODO INVESTIGATE</span>
+        <span class="c1"># main_path = main_file</span>
+        <span class="c1"># if not main_path.is_absolute():</span>
+        <span class="c1">#     main_path = (self.base_dir / main_path).resolve()</span>
+
+        <span class="n">main_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">main_file</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">main_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="n">main_path</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span> <span class="o">/</span> <span class="n">main_path</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+            <span class="k">assert</span> <span class="n">main_path</span><span class="o">.</span><span class="n">exists</span><span class="p">(),</span> <span class="sa">f</span><span class="s2">&quot;Cannot find </span><span class="si">{</span><span class="n">main_path</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="n">text</span> <span class="o">=</span> <span class="n">main_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+        <span class="n">front</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_split_front_matter</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+
+        <span class="n">visited</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="n">body_lines</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_flatten_body</span><span class="p">(</span>
+            <span class="n">path</span><span class="o">=</span><span class="n">main_path</span><span class="p">,</span>
+            <span class="n">recursive</span><span class="o">=</span><span class="n">recursive</span><span class="p">,</span>
+            <span class="n">keep_include_markers</span><span class="o">=</span><span class="n">keep_include_markers</span><span class="p">,</span>
+            <span class="n">visited</span><span class="o">=</span><span class="n">visited</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">out_lines</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">out_lines</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">front</span><span class="p">)</span>
+        <span class="n">out_lines</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">body_lines</span><span class="p">)</span>
+
+        <span class="n">out</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out_lines</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">out</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">out</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">):</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="n">out</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+
+        <span class="n">output_path</span> <span class="o">=</span> <span class="n">output_path</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+        <span class="n">output_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">output_path</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">output_path</span></div>
+
+
+<div class="viewcode-block" id="QuartoTidy._flatten_body">
+<a class="viewcode-back" href="../../api.html#quarto_tools.tidy.QuartoTidy._flatten_body">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_flatten_body</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">recursive</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">keep_include_markers</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">visited</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Recursively expand include directives for the body of a file.</span>
+
+<span class="sd">        The front matter of included files is stripped; only their bodies</span>
+<span class="sd">        contribute to the output.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">visited</span><span class="p">:</span>
+            <span class="c1"># Simple cycle protection: keep the include line as-is at caller.</span>
+            <span class="k">return</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;&lt;!-- cyclic include of </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2"> skipped --&gt;&quot;</span><span class="p">]</span>
+
+        <span class="n">visited</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+        <span class="n">_front</span><span class="p">,</span> <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_split_front_matter</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+
+        <span class="n">out</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">raw</span> <span class="ow">in</span> <span class="n">body</span><span class="p">:</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">INCLUDE_RE</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">match</span><span class="p">:</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="n">include_target</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s2">&quot;path&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\&quot;</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+            <span class="n">include_path</span> <span class="o">=</span> <span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="n">include_target</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">recursive</span><span class="p">:</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="k">if</span> <span class="n">keep_include_markers</span><span class="p">:</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&lt;!-- BEGIN include </span><span class="si">{</span><span class="n">include_target</span><span class="si">}</span><span class="s2"> --&gt;&quot;</span><span class="p">)</span>
+
+            <span class="n">out</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_flatten_body</span><span class="p">(</span>
+                    <span class="n">path</span><span class="o">=</span><span class="n">include_path</span><span class="p">,</span>
+                    <span class="n">recursive</span><span class="o">=</span><span class="n">recursive</span><span class="p">,</span>
+                    <span class="n">keep_include_markers</span><span class="o">=</span><span class="n">keep_include_markers</span><span class="p">,</span>
+                    <span class="n">visited</span><span class="o">=</span><span class="n">visited</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">keep_include_markers</span><span class="p">:</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&lt;!-- END include </span><span class="si">{</span><span class="n">include_target</span><span class="si">}</span><span class="s2"> --&gt;&quot;</span><span class="p">)</span>
+
+        <span class="n">visited</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">out</span></div>
+
+
+    <span class="c1"># ------------------------</span>
+    <span class="c1"># Feature 2: tidy</span>
+    <span class="c1"># ------------------------</span>
+
+<div class="viewcode-block" id="QuartoTidy.tidy">
+<a class="viewcode-back" href="../../api.html#quarto_tools.tidy.QuartoTidy.tidy">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">tidy</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">in_place</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">output_dir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">remove_comments</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">wrap_width</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Normalize formatting of .qmd files.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        in_place :</span>
+<span class="sd">            If True, modify files directly.</span>
+<span class="sd">        output_dir :</span>
+<span class="sd">            If provided and in_place is False, write tidied files here with</span>
+<span class="sd">            mirrored directory structure.</span>
+<span class="sd">        remove_comments :</span>
+<span class="sd">            Remove HTML comments &lt;!-- ... --&gt; outside code fences.</span>
+<span class="sd">        wrap_width :</span>
+<span class="sd">            If provided, wrap prose paragraphs to this width.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pandas.DataFrame</span>
+<span class="sd">            Summary with columns: file, changed, lines_before, lines_after.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">in_place</span> <span class="ow">and</span> <span class="n">output_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;output_dir must be provided when in_place is False.&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="n">sources</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_discover_sources</span><span class="p">()</span>
+        <span class="n">records</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">src</span> <span class="ow">in</span> <span class="n">sources</span><span class="p">:</span>
+            <span class="n">text</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+            <span class="n">front</span><span class="p">,</span> <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_split_front_matter</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+            <span class="n">original_lines</span> <span class="o">=</span> <span class="n">text</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
+
+            <span class="n">tidied_body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tidy_body_lines</span><span class="p">(</span>
+                <span class="n">body_lines</span><span class="o">=</span><span class="n">body</span><span class="p">,</span>
+                <span class="n">remove_comments</span><span class="o">=</span><span class="n">remove_comments</span><span class="p">,</span>
+                <span class="n">wrap_width</span><span class="o">=</span><span class="n">wrap_width</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">new_lines</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">new_lines</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">front</span><span class="p">)</span>
+            <span class="n">new_lines</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">tidied_body</span><span class="p">)</span>
+
+            <span class="n">new_text</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">new_lines</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">new_text</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">new_text</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">):</span>
+                <span class="n">new_text</span> <span class="o">=</span> <span class="n">new_text</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+
+            <span class="c1"># Normalize original text to have a final newline for comparison.</span>
+            <span class="n">original_text_norm</span> <span class="o">=</span> <span class="n">text</span> <span class="k">if</span> <span class="n">text</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">text</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="n">changed</span> <span class="o">=</span> <span class="n">new_text</span> <span class="o">!=</span> <span class="n">original_text_norm</span>
+
+            <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;file&quot;</span><span class="p">:</span> <span class="n">src</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">),</span>
+                    <span class="s2">&quot;changed&quot;</span><span class="p">:</span> <span class="n">changed</span><span class="p">,</span>
+                    <span class="s2">&quot;lines_before&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">original_lines</span><span class="p">),</span>
+                    <span class="s2">&quot;lines_after&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">new_lines</span><span class="p">),</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">changed</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="k">if</span> <span class="n">in_place</span><span class="p">:</span>
+                <span class="n">target_path</span> <span class="o">=</span> <span class="n">src</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">assert</span> <span class="n">output_dir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="n">rel</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">)</span>
+                <span class="n">target_path</span> <span class="o">=</span> <span class="p">(</span><span class="n">output_dir</span> <span class="o">/</span> <span class="n">rel</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+                <span class="n">target_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="n">target_path</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">new_text</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="o">.</span><span class="n">from_records</span><span class="p">(</span><span class="n">records</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">df</span></div>
+
+
+<div class="viewcode-block" id="QuartoTidy._tidy_body_lines">
+<a class="viewcode-back" href="../../api.html#quarto_tools.tidy.QuartoTidy._tidy_body_lines">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_tidy_body_lines</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">body_lines</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">remove_comments</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">wrap_width</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Tidy only the body (no YAML front matter).</span>
+
+<span class="sd">        This function:</span>
+<span class="sd">          - normalizes blank lines outside code fences,</span>
+<span class="sd">          - optionally removes HTML comments,</span>
+<span class="sd">          - optionally wraps paragraphs to a target width,</span>
+<span class="sd">          - leaves fenced code blocks untouched.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">in_code</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">tidied</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">pending_paragraph</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">in_html_comment</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">flush_paragraph</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Flush the current paragraph into tidied, applying wrapping if requested.</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="k">nonlocal</span> <span class="n">pending_paragraph</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">pending_paragraph</span><span class="p">:</span>
+                <span class="k">return</span>
+
+            <span class="k">if</span> <span class="n">wrap_width</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">pending_paragraph</span><span class="p">:</span>
+                    <span class="n">tidied</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">rstrip</span><span class="p">())</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Simple paragraph wrapper: join with spaces and re-wrap.</span>
+                <span class="n">text</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">pending_paragraph</span><span class="p">)</span>
+                <span class="n">wrapped</span> <span class="o">=</span> <span class="n">textwrap</span><span class="o">.</span><span class="n">wrap</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="n">wrap_width</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">wrapped</span><span class="p">:</span>
+                    <span class="n">tidied</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">wrapped_line</span> <span class="ow">in</span> <span class="n">wrapped</span><span class="p">:</span>
+                        <span class="n">tidied</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">wrapped_line</span><span class="p">)</span>
+            <span class="n">pending_paragraph</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">raw</span> <span class="ow">in</span> <span class="n">body_lines</span><span class="p">:</span>
+            <span class="n">line</span> <span class="o">=</span> <span class="n">raw</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Detect start/end of fenced code blocks.</span>
+            <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">lstrip</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;```&quot;</span><span class="p">):</span>
+                <span class="c1"># Before switching modes, flush any paragraph we have accumulated.</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">in_code</span><span class="p">:</span>
+                    <span class="n">flush_paragraph</span><span class="p">()</span>
+                    <span class="c1"># Ensure a blank line before a code fence if previous</span>
+                    <span class="c1"># non-empty line was not blank.</span>
+                    <span class="k">if</span> <span class="n">tidied</span> <span class="ow">and</span> <span class="n">tidied</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
+                        <span class="n">tidied</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="n">in_code</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">in_code</span>
+                <span class="n">tidied</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+                <span class="c1"># After closing a code block, insert a blank line.</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">in_code</span><span class="p">:</span>
+                    <span class="n">tidied</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="k">if</span> <span class="n">in_code</span><span class="p">:</span>
+                <span class="n">tidied</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># Outside code fences: handle optional comment stripping.</span>
+            <span class="k">if</span> <span class="n">remove_comments</span><span class="p">:</span>
+                <span class="c1"># Handle multi-line HTML comments.</span>
+                <span class="k">if</span> <span class="n">in_html_comment</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="s2">&quot;--&gt;&quot;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+                        <span class="n">in_html_comment</span> <span class="o">=</span> <span class="kc">False</span>
+                    <span class="k">continue</span>
+
+                <span class="k">if</span> <span class="s2">&quot;&lt;!--&quot;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+                    <span class="c1"># If comment closes on same line, drop the whole line.</span>
+                    <span class="k">if</span> <span class="s2">&quot;--&gt;&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">line</span> <span class="ow">or</span> <span class="n">line</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;--&gt;&quot;</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">line</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;&lt;!--&quot;</span><span class="p">):</span>
+                        <span class="n">in_html_comment</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="k">continue</span>
+
+            <span class="c1"># Normalize whitespace and paragraphs.</span>
+            <span class="n">stripped</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">stripped</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
+                <span class="c1"># Blank line ends a paragraph.</span>
+                <span class="n">flush_paragraph</span><span class="p">()</span>
+                <span class="c1"># Avoid multiple consecutive blank lines.</span>
+                <span class="k">if</span> <span class="n">tidied</span> <span class="ow">and</span> <span class="n">tidied</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">tidied</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># Headings: ensure a blank line before them.</span>
+            <span class="k">if</span> <span class="n">stripped</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;#&quot;</span><span class="p">):</span>
+                <span class="n">flush_paragraph</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">tidied</span> <span class="ow">and</span> <span class="n">tidied</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
+                    <span class="n">tidied</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="n">tidied</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stripped</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># Normal prose line: accumulate into current paragraph.</span>
+            <span class="n">pending_paragraph</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stripped</span><span class="p">)</span>
+
+        <span class="c1"># Flush any remaining paragraph at end.</span>
+        <span class="n">flush_paragraph</span><span class="p">()</span>
+
+        <span class="c1"># Remove trailing blank lines.</span>
+        <span class="k">while</span> <span class="n">tidied</span> <span class="ow">and</span> <span class="n">tidied</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
+            <span class="n">tidied</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">tidied</span></div>
+
+
+    <span class="c1"># ------------------------</span>
+    <span class="c1"># Feature 3: report</span>
+    <span class="c1"># ------------------------</span>
+
+<div class="viewcode-block" id="QuartoTidy.report">
+<a class="viewcode-back" href="../../api.html#quarto_tools.tidy.QuartoTidy.report">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">report</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">include_xrefs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">include_bibtex</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">include_python</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate a project report: xrefs, citations, python blocks.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        include_xrefs :</span>
+<span class="sd">            Include cross-reference validation.</span>
+<span class="sd">        include_bibtex :</span>
+<span class="sd">            Include citation / bibtex analysis.</span>
+<span class="sd">        include_python :</span>
+<span class="sd">            Include python-block inventory.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict</span>
+<span class="sd">            Results keyed by &#39;xrefs&#39;, &#39;bibtex&#39;, &#39;python&#39;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">results</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># xrefs</span>
+        <span class="k">if</span> <span class="n">include_xrefs</span><span class="p">:</span>
+            <span class="n">xrefs</span> <span class="o">=</span> <span class="n">QuartoXRefs</span><span class="p">(</span>
+                <span class="n">base_dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">,</span>
+                <span class="n">project_yaml</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project_yaml</span><span class="p">,</span>
+                <span class="n">file_patterns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">file_patterns</span><span class="p">,</span>
+                <span class="n">explicit_files</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">explicit_files</span><span class="p">,</span>
+                <span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">results</span><span class="p">[</span><span class="s2">&quot;xrefs&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">xrefs</span><span class="o">.</span><span class="n">validate</span><span class="p">()</span>
+
+        <span class="c1"># bibtex</span>
+        <span class="k">if</span> <span class="n">include_bibtex</span><span class="p">:</span>
+            <span class="n">bib</span> <span class="o">=</span> <span class="n">QuartoBibTex</span><span class="p">(</span>
+                <span class="n">base_dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">,</span>
+                <span class="n">project_yaml</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project_yaml</span><span class="p">,</span>
+                <span class="n">file_patterns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">file_patterns</span><span class="p">,</span>
+                <span class="n">explicit_files</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">explicit_files</span><span class="p">,</span>
+                <span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">sources</span> <span class="o">=</span> <span class="n">bib</span><span class="o">.</span><span class="n">_discover_sources</span><span class="p">()</span>
+            <span class="n">citation_keys</span> <span class="o">=</span> <span class="n">bib</span><span class="o">.</span><span class="n">collect_citations</span><span class="p">(</span><span class="n">sources</span><span class="p">)</span>
+            <span class="n">bib_paths</span> <span class="o">=</span> <span class="n">bib</span><span class="o">.</span><span class="n">_collect_bib_paths</span><span class="p">(</span><span class="n">sources</span><span class="p">)</span>
+
+            <span class="n">all_rows</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">bib_path</span> <span class="ow">in</span> <span class="n">bib_paths</span><span class="p">:</span>
+                <span class="n">text</span> <span class="o">=</span> <span class="n">bib_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="n">bib</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+                <span class="n">all_rows</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">parse_bibtex_text</span><span class="p">(</span><span class="n">text</span><span class="p">))</span>
+
+            <span class="n">all_bib_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">all_rows</span><span class="p">)</span> <span class="k">if</span> <span class="n">all_rows</span> <span class="k">else</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">all_bib_df</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="s2">&quot;tag&quot;</span> <span class="ow">in</span> <span class="n">all_bib_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="n">all_tags</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">all_bib_df</span><span class="p">[</span><span class="s2">&quot;tag&quot;</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">all_tags</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+            <span class="n">missing_citations</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">citation_keys</span> <span class="o">-</span> <span class="n">all_tags</span><span class="p">)</span>
+            <span class="n">unused_entries</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">all_tags</span> <span class="o">-</span> <span class="n">citation_keys</span><span class="p">)</span>
+
+            <span class="n">results</span><span class="p">[</span><span class="s2">&quot;bibtex&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;citation_keys&quot;</span><span class="p">:</span> <span class="n">citation_keys</span><span class="p">,</span>
+                <span class="s2">&quot;bib_df&quot;</span><span class="p">:</span> <span class="n">all_bib_df</span><span class="p">,</span>
+                <span class="s2">&quot;missing_citations_df&quot;</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">&quot;tag&quot;</span><span class="p">:</span> <span class="n">missing_citations</span><span class="p">}),</span>
+                <span class="s2">&quot;unused_bib_entries_df&quot;</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">&quot;tag&quot;</span><span class="p">:</span> <span class="n">unused_entries</span><span class="p">}),</span>
+                <span class="s2">&quot;bibtex_paths&quot;</span><span class="p">:</span> <span class="n">bib</span><span class="o">.</span><span class="n">bib_paths</span><span class="p">,</span>
+            <span class="p">}</span>
+
+        <span class="c1"># python blocks</span>
+        <span class="k">if</span> <span class="n">include_python</span><span class="p">:</span>
+            <span class="n">blocks</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">CodeBlock</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">sizes</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">src</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_discover_sources</span><span class="p">():</span>
+                <span class="n">text</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+                <span class="n">file_blocks</span> <span class="o">=</span> <span class="n">extract_code_blocks</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">lang</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">)</span>
+                <span class="n">blocks</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">file_blocks</span><span class="p">)</span>
+                <span class="n">sizes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;file&quot;</span><span class="p">:</span> <span class="n">src</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">),</span>
+                        <span class="s2">&quot;blocks&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">file_blocks</span><span class="p">),</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">blocks</span><span class="p">:</span>
+                <span class="n">blocks_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+                    <span class="p">[</span>
+                        <span class="p">{</span>
+                            <span class="s2">&quot;file&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">),</span>
+                            <span class="s2">&quot;block_index&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">block_index</span><span class="p">,</span>
+                            <span class="s2">&quot;lang&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">lang</span><span class="p">,</span>
+                            <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">label</span><span class="p">,</span>
+                            <span class="s2">&quot;caption&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">caption</span><span class="p">,</span>
+                            <span class="s2">&quot;start_line&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">start_line</span><span class="p">,</span>
+                            <span class="s2">&quot;end_line&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">end_line</span><span class="p">,</span>
+                        <span class="p">}</span>
+                        <span class="k">for</span> <span class="n">block</span> <span class="ow">in</span> <span class="n">blocks</span>
+                    <span class="p">]</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">blocks_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+                    <span class="n">columns</span><span class="o">=</span><span class="p">[</span>
+                        <span class="s2">&quot;file&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;block_index&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;lang&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;label&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;caption&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;start_line&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;end_line&quot;</span><span class="p">,</span>
+                    <span class="p">]</span>
+                <span class="p">)</span>
+
+            <span class="n">summary_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="o">.</span><span class="n">from_records</span><span class="p">(</span><span class="n">sizes</span><span class="p">)</span>
+            <span class="n">results</span><span class="p">[</span><span class="s2">&quot;python&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;blocks_df&quot;</span><span class="p">:</span> <span class="n">blocks_df</span><span class="p">,</span>
+                <span class="s2">&quot;summary_df&quot;</span><span class="p">:</span> <span class="n">summary_df</span><span class="p">,</span>
+            <span class="p">}</span>
+
+        <span class="k">return</span> <span class="n">results</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Stephen J. Mildenhall.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

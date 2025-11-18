@@ -302,6 +302,8 @@ def resolve_quarto_context(
     """
     Resolve INPUT_PATH into a canonical Quarto project context.
 
+    Used only in CLI!
+
     This function centralizes all path/YAML discovery rules used by the
     quarto_tools CLI (tidy, toc, xref, bibtex, pytest).  All commands should
     use this function so that project discovery behaves consistently.

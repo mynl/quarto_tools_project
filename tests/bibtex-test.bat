@@ -3,19 +3,19 @@
 
 setlocal
 
-pushd \tmp\bib
+pushd \tmp\qt-test
 
 echo Bibtex test for PMIR
-qt bibtex \s\TELOS\PMIR_StudyNote\working-blog -b pmir.bib -d pmir.csv
+rem qt bibtex \s\TELOS\PMIR_StudyNote\working-blog -b pmir.bib -d pmir.csv
+qt bibtex pmir-test -w -o TEST-PREFIX
 
 
 echo ------------------------------------------------------------------------------------
 echo Bibtex test for CMM
-qt bibtex C:\Users\steve\S\TELOS\CapitalModeling\TMA1 -b cmm.bib -d cmm.csv
+qt bibtex cmm-test -w
+rem qt bibtex C:\Users\steve\S\TELOS\CapitalModeling\TMA1 -b cmm.bib -d cmm.csv
 
 
-echo ------------------------------------------------------------------------------------
-echo Bibtex test for CMM
-qt bibtex C:\Users\steve\S\TELOS\CMM_CAS\source -b C:\Users\steve\S\TELOS\CMM_CAS\source\cmm.bib
+bibtex C:/Users/steve/S/TELOS/CapitalModeling/TMA1 -b cmm.bib -d cmm.csv
 
-popd \tmp
+popd

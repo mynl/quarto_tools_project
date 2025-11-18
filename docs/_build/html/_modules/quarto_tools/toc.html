@@ -1,0 +1,1232 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>quarto_tools.toc &mdash; quarto_tools  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            quarto_tools
+              <img src="../../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">quarto_tools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">quarto_tools.toc</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for quarto_tools.toc</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Create TikZ Table of Contents from a Quarto project, with:</span>
+<span class="sd">- copious debug comments and whitespace for readability,</span>
+<span class="sd">- chapter header baseline alignment,</span>
+<span class="sd">- look-ahead chapter cache to decide row wrapping by remaining column capacity.</span>
+
+<span class="sd">Windows usage (example):</span>
+<span class="sd">  python -m quarto_tools.toc C:\\path\\to\\quarto\\project C:\\out\\toc.tex</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">accumulate</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">click</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">discover_quarto_sources</span><span class="p">,</span> <span class="n">extract_front_matter</span><span class="p">,</span>
+                    <span class="n">strip_code_blocks</span><span class="p">,</span> <span class="n">git_info</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="QuartoToc">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">QuartoToc</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Build a five-level TikZ TOC from a Quarto project or file.</span>
+
+<span class="sd">    Levels:</span>
+<span class="sd">      - Title: large bold title on top left of page; with date time stamp and github info if available</span>
+<span class="sd">      - Chapters: bold, shaded box at top of each column, with ch #</span>
+<span class="sd">      - Sections: ch.sec Numbered, roman font</span>
+<span class="sd">      - Subsections: bulleted separated paragraph below section</span>
+<span class="sd">      - Subsubsection: comma separated list within parenthesis within subsections</span>
+
+<span class="sd">    Key features:</span>
+<span class="sd">      - Baseline-aligned chapter headers (anchor=base west; chapter→chapter chaining via .base east).</span>
+<span class="sd">      - Subsection balancing into subcolumns by height.</span>
+<span class="sd">      - Look-ahead chapter cache to decide row wrapping by remaining subcolumn capacity.</span>
+<span class="sd">      - Optional verbose debug mode that emits clear LaTeX comments and structure.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        base_dir:</span>
+<span class="sd">            Root Quarto directory or single .qmd/.qmd-tree to parse.</span>
+
+<span class="sd">        max_levels:</span>
+<span class="sd">            Maximum heading depth to include. -1 means full depth; 1 gives</span>
+<span class="sd">            chapters only; 2 gives chapters and sections; etc.</span>
+
+<span class="sd">        up_level:</span>
+<span class="sd">            If true, promote the highest heading level found so that (for</span>
+<span class="sd">            example) ### becomes a chapter level.</span>
+
+<span class="sd">        omit_titles:</span>
+<span class="sd">            Set of titles to exclude when building the TOC.</span>
+
+<span class="sd">        chapter_min_height:</span>
+<span class="sd">            Minimum height of the chapter header box; &quot;auto&quot; computes a value</span>
+<span class="sd">            based on title length.</span>
+
+<span class="sd">        section_max_height:</span>
+<span class="sd">            Maximum height of a section subcolumn (e.g., &quot;6cm&quot;). Sections wrap</span>
+<span class="sd">            across subcolumns when this cap is exceeded.</span>
+
+<span class="sd">        max_columns_per_row:</span>
+<span class="sd">            Total subcolumn capacity per row before forcing a wrap.</span>
+
+<span class="sd">        balance_mode:</span>
+<span class="sd">            Subcolumn packing rule: &quot;stable&quot; respects document order; &quot;ffd&quot;</span>
+<span class="sd">            uses first-fit decreasing by estimated height.</span>
+
+<span class="sd">        title_gap:</span>
+<span class="sd">            Vertical gap between the title bar and the first row of chapters.</span>
+
+<span class="sd">        section_top_gap:</span>
+<span class="sd">            Vertical gap between a chapter header and the first section node.</span>
+
+<span class="sd">        column_width:</span>
+<span class="sd">            Width of each chapter column.</span>
+
+<span class="sd">        column_gap:</span>
+<span class="sd">            Horizontal gap between chapter groups.</span>
+
+<span class="sd">        section_column_gap:</span>
+<span class="sd">            Horizontal gap between section subcolumns within one chapter.</span>
+
+<span class="sd">        row_gap:</span>
+<span class="sd">            Vertical gap between rows.</span>
+
+<span class="sd">        title_col, chapter_col, section_col, subsection_col:</span>
+<span class="sd">            DataFrame column names used during parsing and layout.</span>
+
+<span class="sd">        chars_per_cm_title, chars_per_cm_subs:</span>
+<span class="sd">            Heuristics used to estimate line counts in title and subsection</span>
+<span class="sd">            text.</span>
+
+<span class="sd">        baseline_large_pt, baseline_norm_pt, baseline_subs_pt:</span>
+<span class="sd">            Baseline skips (in points) for chapter headers, section titles,</span>
+<span class="sd">            and subsections.</span>
+
+<span class="sd">        subs_linespread:</span>
+<span class="sd">            Multiplicative line spacing used for subsection text.</span>
+
+<span class="sd">        top_prefix_lines:</span>
+<span class="sd">            Number of prefix lines reserved in the chapter header (e.g., “Ch NN”).</span>
+
+<span class="sd">        padding_pt:</span>
+<span class="sd">            Inner padding around chapter header nodes.</span>
+
+<span class="sd">        gap_pt:</span>
+<span class="sd">            Vertical gap between section title and subsection block.</span>
+
+<span class="sd">        inner_sep_section_pt:</span>
+<span class="sd">            Inner padding for section nodes.</span>
+
+<span class="sd">        encoding:</span>
+<span class="sd">            File-reading encoding.</span>
+
+<span class="sd">        trust_tex:</span>
+<span class="sd">            If true, skip escaping LaTeX specials and trust the input text.</span>
+
+<span class="sd">        debug:</span>
+<span class="sd">            If true, emit LaTeX comments and light node outlines to help visualize</span>
+<span class="sd">            layout and alignment.</span>
+
+<span class="sd">        project_yaml:</span>
+<span class="sd">            Explicit _quarto.yml / .yaml, if not under base_dir</span>
+
+<span class="sd">        file_patterns:</span>
+<span class="sd">            Glob patterns relative to base_dir (e.g., (&quot;*.qmd&quot;, &quot;posts/*.qmd&quot;))</span>
+
+<span class="sd">        explicit_files:</span>
+<span class="sd">            Explicit QMD files; takes precedence over patterns/project_yaml</span>
+
+<span class="sd">        use_yaml_title_as_chapter:</span>
+<span class="sd">            If no level-1 heading in a file, use its front-matter title as a synthetic chapter</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Inputs</span>
+    <span class="n">base_dir</span><span class="p">:</span> <span class="n">Path</span>
+
+    <span class="c1"># Layout and parsing options</span>
+    <span class="n">max_levels</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>                         <span class="c1"># how many levels to use, -1 = all levels, 1 = chapter only, 2 = chapter / section etc.</span>
+    <span class="n">up_level</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>                       <span class="c1"># If true, then adjust levels so that the highest level found (eg ###) becomes treated as chapters (#)</span>
+    <span class="n">omit_titles</span><span class="p">:</span> <span class="nb">set</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">chapter_min_height</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span>      <span class="c1"># height of chapter name box</span>
+    <span class="n">section_max_height</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;6cm&quot;</span>       <span class="c1"># cap for subcolumn height; sections wrap across subcolumns</span>
+    <span class="n">max_columns_per_row</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>       <span class="c1"># Row capacity (preferred): number of subcolumns per row.</span>
+    <span class="n">balance_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;stable&quot;</span>                 <span class="c1"># &quot;stable&quot; or &quot;ffd&quot; (first-fit decreasing)</span>
+
+    <span class="c1"># Column and gap geometry</span>
+    <span class="n">title_gap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;4mm&quot;</span>                       <span class="c1"># gap from titlebar to to of toc</span>
+    <span class="n">section_top_gap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;1.5mm&quot;</span>               <span class="c1"># vertical gap from chapter box to first section column</span>
+    <span class="n">column_width</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;5cm&quot;</span>                    <span class="c1"># width of each chapter column</span>
+    <span class="n">column_gap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;3mm&quot;</span>                      <span class="c1"># gap between chapter groups</span>
+    <span class="n">section_column_gap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;3mm&quot;</span>              <span class="c1"># gap between section subcolumns</span>
+    <span class="n">row_gap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;5mm&quot;</span>                         <span class="c1"># vertical gap between rows</span>
+
+    <span class="c1"># Dataframe column names - largely redundant</span>
+    <span class="n">title_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;title&quot;</span>
+    <span class="n">chapter_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;chapter&quot;</span>
+    <span class="n">section_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;section&quot;</span>
+    <span class="n">subsection_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;subsection&quot;</span>
+
+    <span class="c1"># Text metrics (rough heuristics)</span>
+    <span class="n">chars_per_cm_title</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">7.5</span>
+    <span class="n">chars_per_cm_subs</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">8.8</span>
+    <span class="n">baseline_large_pt</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">14.5</span>
+    <span class="n">baseline_norm_pt</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">12.0</span>
+    <span class="n">baseline_subs_pt</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">8.5</span>
+    <span class="n">subs_linespread</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.8</span>
+    <span class="n">top_prefix_lines</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>                    <span class="c1"># line for &quot;Ch NN&quot; in heading</span>
+    <span class="n">padding_pt</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">8.0</span>                      <span class="c1"># inner sep for chapter nodes</span>
+    <span class="n">gap_pt</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span>                          <span class="c1"># between title and subs for sections</span>
+    <span class="n">inner_sep_section_pt</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">6.0</span>            <span class="c1"># inner sep for section nodes</span>
+    <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;utf-8&quot;</span>                      <span class="c1"># for reading files</span>
+
+    <span class="c1"># Meta</span>
+    <span class="n">trust_tex</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>                       <span class="c1"># stops using _escape_latex</span>
+    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>                          <span class="c1"># Emit comments and faint boxes for debugging/reading</span>
+
+    <span class="c1"># NEW</span>
+    <span class="c1"># Source discovery and file-level options</span>
+    <span class="n">project_yaml</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>             <span class="c1"># explicit _quarto.yml / .yaml, if not under base_dir</span>
+    <span class="n">file_patterns</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>          <span class="c1"># glob patterns relative to base_dir (e.g., (&quot;*.qmd&quot;, &quot;posts/*.qmd&quot;))</span>
+    <span class="n">explicit_files</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>        <span class="c1"># explicit QMD files; takes precedence over patterns/project_yaml</span>
+    <span class="n">use_yaml_title_as_chapter</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>       <span class="c1"># if no level-1 heading in a file, use its front-matter title as a synthetic chapter</span>
+
+    <span class="n">LATEX_SPECIALS</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;</span><span class="se">\\</span><span class="s2">&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\textbackslash</span><span class="si">{}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;{&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\{&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;}&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\}&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;$&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\$&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;&amp;&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\&amp;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;%&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\%&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;#&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\#&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;_&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\_&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;~&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\textasciitilde</span><span class="si">{}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;^&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\textasciicircum</span><span class="si">{}</span><span class="s2">&quot;</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="c1"># Internal state</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">out_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="c1"># default title; may be overridden from _quarto.yml in project mode</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s2">&quot;Table of Contents&quot;</span>
+        <span class="c1"># chapter layout cache: chapter_index -&gt; dict with columns, slots, title, etc.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_chapter_cache</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="c1"># properties</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">df</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_df</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_df</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_df</span>
+
+    <span class="c1"># ---------- Data extraction ----------</span>
+
+<div class="viewcode-block" id="QuartoToc.make_df">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc.make_df">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">make_df</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extract headings from Quarto sources and build the layout DataFrame.</span>
+
+<span class="sd">        Sources can come from:</span>
+<span class="sd">          - a Quarto project YAML (_quarto.yml / _quarto.yaml),</span>
+<span class="sd">          - one or more explicit .qmd files,</span>
+<span class="sd">          - glob patterns under base_dir.</span>
+
+<span class="sd">        Applies omit_titles and computes chapter/section/subsection counters,</span>
+<span class="sd">        including:</span>
+<span class="sd">          - optional &quot;up-level&quot; of files with no level-1 headings, and</span>
+<span class="sd">          - optional synthetic chapter rows from per-file YAML titles.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">sources</span><span class="p">,</span> <span class="n">project_title</span> <span class="o">=</span> <span class="n">discover_quarto_sources</span><span class="p">(</span>
+            <span class="n">base_dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">,</span>
+            <span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">,</span>
+            <span class="n">project_yaml</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project_yaml</span><span class="p">,</span>
+            <span class="n">file_patterns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">file_patterns</span><span class="p">,</span>
+            <span class="n">explicit_files</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Discovered </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">sources</span><span class="p">)</span><span class="si">}</span><span class="s2"> source file(s).&quot;</span><span class="p">)</span>
+
+        <span class="n">outlines</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">file_index</span><span class="p">,</span> <span class="n">path</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">sources</span><span class="p">):</span>
+            <span class="n">doc_title</span><span class="p">,</span> <span class="n">headings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_file</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="n">outlines</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">file_index</span><span class="p">,</span> <span class="n">doc_title</span><span class="p">,</span> <span class="n">headings</span><span class="p">))</span>
+
+        <span class="n">rows</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">file_index</span><span class="p">,</span> <span class="n">doc_title</span><span class="p">,</span> <span class="n">headings</span> <span class="ow">in</span> <span class="n">outlines</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">headings</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">levels</span> <span class="o">=</span> <span class="p">[</span><span class="n">h</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">headings</span><span class="p">]</span>
+            <span class="n">has_level1</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="n">l</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">levels</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">has_level1</span><span class="p">:</span>
+                <span class="c1"># file already has explicit chapter-level headings</span>
+                <span class="k">for</span> <span class="n">level</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="n">refs</span><span class="p">,</span> <span class="n">_order</span> <span class="ow">in</span> <span class="n">headings</span><span class="p">:</span>
+                    <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">level</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="n">refs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">refs</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># no level-1 headings in this file</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_yaml_title_as_chapter</span> <span class="ow">and</span> <span class="n">doc_title</span><span class="p">:</span>
+                    <span class="c1"># synthetic chapter row from per-file YAML title</span>
+                    <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="n">doc_title</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">])</span>
+                    <span class="k">for</span> <span class="n">level</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="n">refs</span><span class="p">,</span> <span class="n">_order</span> <span class="ow">in</span> <span class="n">headings</span><span class="p">:</span>
+                        <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">level</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="n">refs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">refs</span><span class="p">])</span>
+                <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">up_level</span><span class="p">:</span>
+                    <span class="c1"># shift smallest heading level down to 1 (per file)</span>
+                    <span class="n">min_level</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">levels</span><span class="p">)</span>
+                    <span class="n">shift</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">min_level</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">level</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="n">refs</span><span class="p">,</span> <span class="n">_order</span> <span class="ow">in</span> <span class="n">headings</span><span class="p">:</span>
+                        <span class="n">new_level</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">level</span> <span class="o">-</span> <span class="n">shift</span><span class="p">)</span>
+                        <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">new_level</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="n">refs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">refs</span><span class="p">])</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># leave as-is; first heading will behave like a chapter in the existing scheme</span>
+                    <span class="k">for</span> <span class="n">level</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="n">refs</span><span class="p">,</span> <span class="n">_order</span> <span class="ow">in</span> <span class="n">headings</span><span class="p">:</span>
+                        <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">level</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="n">refs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">refs</span><span class="p">])</span>
+
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">,</span> <span class="s2">&quot;title&quot;</span><span class="p">,</span> <span class="s2">&quot;refs&quot;</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">omit_titles</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s2">&quot;title not in @self.omit_titles&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_add_levels</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">initial</span><span class="p">):</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Add the level information.</span>
+
+<span class="sd">            If initial==0 then the first chapter is 0 which is not printed.</span>
+<span class="sd">            If initial==1 then it is 1 and it is used.</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="n">df</span><span class="p">[</span><span class="s2">&quot;chapter&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">i</span> <span class="o">-</span> <span class="mi">1</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">accumulate</span><span class="p">(</span>
+                    <span class="n">df</span><span class="o">.</span><span class="n">level</span><span class="p">,</span>
+                    <span class="k">lambda</span> <span class="n">a</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">a</span> <span class="o">+</span> <span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="mi">1</span><span class="p">),</span>
+                    <span class="n">initial</span><span class="o">=</span><span class="n">initial</span>
+                    <span class="p">)</span>
+                <span class="p">][</span><span class="mi">1</span><span class="p">:]</span>
+            <span class="n">df</span><span class="p">[</span><span class="s2">&quot;section&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">i</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">accumulate</span><span class="p">(</span>
+                    <span class="n">df</span><span class="o">.</span><span class="n">level</span><span class="p">,</span>
+                    <span class="k">lambda</span> <span class="n">a</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">x</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">a</span> <span class="o">+</span> <span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="mi">2</span><span class="p">),</span>
+                    <span class="n">initial</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">][</span><span class="mi">1</span><span class="p">:]</span>
+            <span class="n">df</span><span class="p">[</span><span class="s2">&quot;subsection&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">i</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">accumulate</span><span class="p">(</span>
+                    <span class="n">df</span><span class="o">.</span><span class="n">level</span><span class="p">,</span>
+                    <span class="k">lambda</span> <span class="n">a</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">x</span> <span class="o">&lt;=</span> <span class="mi">2</span> <span class="k">else</span> <span class="n">a</span> <span class="o">+</span> <span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="mi">3</span><span class="p">),</span>
+                    <span class="n">initial</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">][</span><span class="mi">1</span><span class="p">:]</span>
+            <span class="n">df</span><span class="p">[</span><span class="s2">&quot;subsubsection&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">i</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">accumulate</span><span class="p">(</span>
+                    <span class="n">df</span><span class="o">.</span><span class="n">level</span><span class="p">,</span>
+                    <span class="k">lambda</span> <span class="n">a</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">x</span> <span class="o">&lt;=</span> <span class="mi">3</span> <span class="k">else</span> <span class="n">a</span> <span class="o">+</span> <span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="mi">4</span><span class="p">),</span>
+                    <span class="n">initial</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">][</span><span class="mi">1</span><span class="p">:]</span>
+            <span class="k">return</span> <span class="n">df</span>
+        <span class="c1"># is the first chapter numbered?</span>
+        <span class="n">lvl</span><span class="p">,</span> <span class="n">refs</span> <span class="o">=</span> <span class="n">df</span><span class="p">[[</span><span class="s1">&#39;level&#39;</span><span class="p">,</span><span class="s1">&#39;refs&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">lvl</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">refs</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;unnumbered&#39;</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># do not number first chapter</span>
+            <span class="n">initial</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># number the first chapter</span>
+            <span class="n">initial</span> <span class="o">=</span> <span class="mi">1</span>
+
+        <span class="n">df</span> <span class="o">=</span> <span class="n">_add_levels</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">initial</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">project_title</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># if no project title discovered and only one # (level == 1) item then</span>
+            <span class="c1"># promote it to the title</span>
+            <span class="n">h1</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;level == 1&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">h1</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">h1_row</span> <span class="o">=</span> <span class="n">h1</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">h1_row</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;WARNING: Found only 1 H1 row, but at position </span><span class="si">{</span><span class="n">h1_row</span><span class="si">}</span><span class="s1"> not expected 0.</span><span class="se">\n</span><span class="s1">Still executing PROMOTE.&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_escape_latex</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">h1_row</span><span class="p">,</span> <span class="s1">&#39;title&#39;</span><span class="p">])</span>
+                <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="n">h1_row</span><span class="p">)</span>
+                <span class="c1"># promote all other levels</span>
+                <span class="n">df</span><span class="o">.</span><span class="n">level</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">level</span> <span class="o">-</span> <span class="mi">1</span>
+                <span class="c1"># renumber, and start with the first chapter regardless</span>
+                <span class="n">df</span> <span class="o">=</span> <span class="n">_add_levels</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">initial</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># use title</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_escape_latex</span><span class="p">(</span><span class="n">project_title</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">df</span></div>
+
+
+<div class="viewcode-block" id="QuartoToc._original_make_df">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc._original_make_df">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_original_make_df</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extract headings levels 1..4 from a Quarto project.</span>
+<span class="sd">        Applies omit_titles, computes chapter/section/subsection counters.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">yaml_path</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span> <span class="o">/</span> <span class="s2">&quot;_quarto.yml&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="n">yaml_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span> <span class="o">/</span> <span class="s2">&quot;_quarto.yml&quot;</span>
+        <span class="k">elif</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span> <span class="o">/</span> <span class="s2">&quot;_quarto.yaml&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="n">yaml_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span> <span class="o">/</span> <span class="s2">&quot;_quarto.yaml&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot find _quarto file.&quot;</span><span class="p">)</span>
+
+        <span class="n">yaml_split</span> <span class="o">=</span> <span class="n">yaml_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># extract the title</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">yaml_split</span><span class="p">:</span>
+            <span class="n">line</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;title:&#39;</span><span class="p">):</span>
+                <span class="n">title</span> <span class="o">=</span> <span class="n">line</span><span class="p">[</span><span class="mi">7</span><span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">title</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;&quot;&#39;</span> <span class="ow">or</span> <span class="n">title</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;&#39;&quot;</span><span class="p">:</span>
+                    <span class="n">title</span> <span class="o">=</span> <span class="n">title</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+                <span class="k">if</span> <span class="n">title</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;&quot;&#39;</span> <span class="ow">or</span> <span class="n">title</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;&#39;&quot;</span><span class="p">:</span>
+                    <span class="n">title</span> <span class="o">=</span> <span class="n">title</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">title</span>
+
+        <span class="n">chs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">yaml_split</span><span class="p">[</span><span class="n">yaml_split</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;  chapters:&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:]:</span>
+            <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;    - &quot;</span><span class="p">):</span>
+                <span class="n">fn</span> <span class="o">=</span> <span class="n">line</span><span class="p">[</span><span class="mi">6</span><span class="p">:]</span>
+                <span class="n">part_file_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span> <span class="o">/</span> <span class="n">fn</span>
+                <span class="n">chs</span><span class="p">[</span><span class="n">fn</span><span class="p">]</span> <span class="o">=</span> <span class="n">part_file_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+                <span class="n">includes</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">chs</span><span class="p">[</span><span class="n">fn</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;{{&lt; include &quot;</span><span class="p">)]</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">includes</span><span class="p">:</span>
+                    <span class="n">inc</span> <span class="o">=</span> <span class="n">i</span><span class="p">[</span><span class="mi">12</span><span class="p">:</span><span class="o">-</span><span class="mi">4</span><span class="p">]</span>  <span class="c1"># {{&lt; include 020-files/finance.qmd &gt;}}</span>
+                    <span class="n">include_path</span> <span class="o">=</span> <span class="n">part_file_path</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="n">inc</span>
+                    <span class="n">chs</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;posts/</span><span class="si">{</span><span class="n">inc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">include_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">break</span>
+
+        <span class="n">sects</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">rec</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^(?&lt;!#\|)(#{1,}) (.*?)(?:$| (\{.*\})$)&quot;</span><span class="p">)</span>
+        <span class="n">incode_rex</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^```|&lt;!\-\-|\-\-&gt;|&lt;!\-\-.*?\-\-&gt;&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">chs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">sects</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">incode</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">v</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">incode_rex</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">line</span><span class="p">):</span>
+                    <span class="n">incode</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">incode</span>
+                <span class="k">if</span> <span class="n">incode</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">m</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">m</span><span class="p">:</span>
+                    <span class="n">sects</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">m</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">m</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">m</span><span class="p">[</span><span class="mi">3</span><span class="p">]])</span>
+
+        <span class="n">rows</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">sects</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">rows</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="p">[[</span><span class="nb">len</span><span class="p">(</span><span class="n">level</span><span class="p">),</span> <span class="n">title</span><span class="p">,</span> <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="n">refs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">refs</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span> <span class="k">for</span> <span class="n">level</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="n">refs</span> <span class="ow">in</span> <span class="n">f</span><span class="p">]</span>
+            <span class="p">)</span>
+
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">,</span> <span class="s2">&quot;title&quot;</span><span class="p">,</span> <span class="s2">&quot;refs&quot;</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">omit_titles</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s2">&quot;title not in @self.omit_titles&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="n">df</span><span class="p">[</span><span class="s2">&quot;chapter&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">accumulate</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">level</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">a</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">a</span> <span class="o">+</span> <span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="mi">1</span><span class="p">))]</span>
+        <span class="n">df</span><span class="p">[</span><span class="s2">&quot;section&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">accumulate</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">level</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">a</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">x</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">a</span> <span class="o">+</span> <span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="mi">2</span><span class="p">),</span> <span class="n">initial</span><span class="o">=</span><span class="mi">0</span><span class="p">)][</span><span class="mi">1</span><span class="p">:]</span>
+        <span class="n">df</span><span class="p">[</span><span class="s2">&quot;subsection&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">accumulate</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">level</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">a</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">x</span> <span class="o">&lt;=</span> <span class="mi">2</span> <span class="k">else</span> <span class="n">a</span> <span class="o">+</span> <span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="mi">3</span><span class="p">),</span> <span class="n">initial</span><span class="o">=</span><span class="mi">0</span><span class="p">)][</span><span class="mi">1</span><span class="p">:]</span>
+        <span class="n">df</span><span class="p">[</span><span class="s2">&quot;subsubsection&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">accumulate</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">level</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">a</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">x</span> <span class="o">&lt;=</span> <span class="mi">3</span> <span class="k">else</span> <span class="n">a</span> <span class="o">+</span> <span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="mi">4</span><span class="p">),</span> <span class="n">initial</span><span class="o">=</span><span class="mi">0</span><span class="p">)][</span><span class="mi">1</span><span class="p">:]</span>
+
+        <span class="k">return</span> <span class="n">df</span></div>
+
+
+    <span class="c1"># ---------- TikZ emission ----------</span>
+
+<div class="viewcode-block" id="QuartoToc.make_tikz_toc">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc.make_tikz_toc">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">make_tikz_toc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chapter_number</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a TikZ picture of the TOC with baseline-aligned chapter headers</span>
+<span class="sd">        and look-ahead row wrapping by subcolumn capacity.</span>
+
+<span class="sd">        If chapter_number &gt; 0 then up-level everything to produce a</span>
+<span class="sd">        more detailed table for that chapter.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># subset for levels</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_levels</span> <span class="o">&gt;</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;level &lt;= </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">max_levels</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">chapter_number</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">chapter_col</span><span class="si">}</span><span class="s1"> == </span><span class="si">{</span><span class="n">chapter_number</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="c1"># &quot;up level&quot;</span>
+            <span class="n">ch_row</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;level == 1&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">uplevel_chapter_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Chapter </span><span class="si">{</span><span class="n">w</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">ch_row</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;chapter&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">. </span><span class="si">{</span><span class="n">w</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">ch_row</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;title&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="n">ch_row</span><span class="p">)</span>
+            <span class="n">w</span><span class="o">.</span><span class="n">level</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">level</span> <span class="o">-</span> <span class="mi">1</span>
+            <span class="n">w</span><span class="p">[</span><span class="s1">&#39;chapter&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">w</span><span class="p">[</span><span class="s1">&#39;section&#39;</span><span class="p">]</span>
+            <span class="n">w</span><span class="p">[</span><span class="s1">&#39;section&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">w</span><span class="p">[</span><span class="s1">&#39;subsection&#39;</span><span class="p">]</span>
+            <span class="n">w</span><span class="p">[</span><span class="s1">&#39;subsection&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">w</span><span class="p">[</span><span class="s1">&#39;subsubsection&#39;</span><span class="p">]</span>
+            <span class="n">w</span><span class="p">[</span><span class="s1">&#39;subsubsection&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">NA</span>
+
+        <span class="c1"># this is silly to do - was a way to detect chapter headings but better to use level</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">section_col</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">subsection_col</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">w</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="n">w</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">w</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">NA</span><span class="p">)</span>
+
+        <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">sort_values</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">chapter_col</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">section_col</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">subsection_col</span><span class="p">],</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;mergesort&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Infer minimum chapter height if auto</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">chapter_min_height</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;auto&quot;</span><span class="p">):</span>
+            <span class="n">chap_titles</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">w</span><span class="p">[</span><span class="n">w</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">section_col</span><span class="p">]</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span> <span class="o">&amp;</span> <span class="n">w</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">subsection_col</span><span class="p">]</span><span class="o">.</span><span class="n">isna</span><span class="p">()][</span><span class="bp">self</span><span class="o">.</span><span class="n">title_col</span><span class="p">]</span>
+                <span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">chap_titles</span><span class="p">:</span>
+                <span class="n">chap_titles</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">chapter_col</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="bp">self</span><span class="o">.</span><span class="n">title_col</span><span class="p">]</span><span class="o">.</span><span class="n">first</span><span class="p">()</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">chapter_min_height</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_estimate_chapter_min_height_cm</span><span class="p">(</span><span class="n">chap_titles</span><span class="p">)</span>
+
+        <span class="c1"># Pre-compute per-chapter layouts and cache them</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_chapter_cache</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">ch_val</span><span class="p">,</span> <span class="n">ch_df</span> <span class="ow">in</span> <span class="n">w</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">chapter_col</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="n">ch_idx</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">ch_val</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_int_like</span><span class="p">(</span><span class="n">ch_val</span><span class="p">)</span> <span class="k">else</span> <span class="nb">int</span><span class="p">(</span><span class="n">ch_val</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_chapter_cache</span><span class="p">[</span><span class="n">ch_idx</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_chapter_layout</span><span class="p">(</span><span class="n">ch_idx</span><span class="p">,</span> <span class="n">ch_df</span><span class="p">,</span> <span class="n">chapter_number</span><span class="p">)</span>
+
+        <span class="c1"># Row capacity in subcolumns</span>
+        <span class="n">row_capacity</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_columns_per_row</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_columns_per_row</span> <span class="k">else</span> <span class="mi">999999</span>
+
+        <span class="n">out</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">begin</span><span class="si">{tikzpicture}</span><span class="s2">[node distance=2mm]&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;  </span><span class="si">% r</span><span class="s2">equires: </span><span class="se">\\</span><span class="s2">usetikzlibrary{calc,positioning,fit}&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;  </span><span class="se">\\</span><span class="s2">tikzset{&quot;</span><span class="p">)</span>
+
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;    tocChapterBox/.style=</span><span class="se">{{</span><span class="s2">draw=</span><span class="si">{</span><span class="s1">&#39;red!10&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">debug</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;none&#39;</span><span class="si">}</span><span class="s2">, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;fill=black!7, inner sep=6pt, outer sep=0pt, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;align=left, text width=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">column_width</span><span class="si">}</span><span class="s2">, minimum height=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">chapter_min_height</span><span class="si">}</span><span class="se">}}</span><span class="s2">,&quot;</span>
+        <span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;    tocSectionBox/.style=</span><span class="se">{{</span><span class="s2">draw=</span><span class="si">{</span><span class="s1">&#39;blue!10&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">debug</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;none&#39;</span><span class="si">}</span><span class="s2">, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;inner sep=3pt, outer sep=0pt, text ragged, text width=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">column_width</span><span class="si">}</span><span class="se">}}</span><span class="s2">,&quot;</span>
+        <span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;    tocGroupBox/.style={draw=none, inner sep=0pt},&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;    tocRowBox/.style={draw=none, inner sep=0pt}&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;  }&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+        <span class="c1"># prepare for the title</span>
+        <span class="k">if</span> <span class="n">chapter_number</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">title</span> <span class="o">=</span> <span class="n">uplevel_chapter_name</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">title</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;title&quot;</span><span class="p">,</span> <span class="s2">&quot;Table of Contents&quot;</span><span class="p">)</span>
+        <span class="n">commit</span><span class="p">,</span> <span class="n">state</span> <span class="o">=</span> <span class="n">git_info</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">)</span>
+        <span class="n">dt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_now_iso</span><span class="p">()</span>
+        <span class="c1"># --- Title Bar Node ---</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;% --- Title Bar Node ---&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;  % Top-left anchored title; spans the full </span><span class="se">\\</span><span class="s2">textwidth&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;  </span><span class="se">\\</span><span class="s2">node[anchor=north west, inner sep=0pt, text width=</span><span class="se">\\</span><span class="s2">textwidth] (titlebar) at (0,0) {&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;    </span><span class="se">\\</span><span class="s2">hbox to</span><span class="se">\\</span><span class="s2">textwidth{%&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;         </span><span class="se">\\</span><span class="s2">vtop{</span><span class="se">\\</span><span class="s2">hsize=.68</span><span class="se">\\</span><span class="s2">textwidth&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;              </span><span class="se">\\</span><span class="s2">Large</span><span class="se">\\</span><span class="s2">bfseries </span><span class="si">{</span><span class="n">title</span><span class="si">}</span><span class="se">\\</span><span class="s2">par&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;         }%&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;         </span><span class="se">\\</span><span class="s2">hfill&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;         </span><span class="se">\\</span><span class="s2">vtop{</span><span class="se">\\</span><span class="s2">hsize=.32</span><span class="se">\\</span><span class="s2">textwidth&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;              </span><span class="se">\\</span><span class="s2">raggedleft</span><span class="se">\\</span><span class="s2">footnotesize </span><span class="si">{</span><span class="n">dt</span><span class="si">}</span><span class="s2"> </span><span class="se">\\\\</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;              </span><span class="se">\\</span><span class="s2">ttfamily </span><span class="si">{</span><span class="n">commit</span><span class="si">}</span><span class="s2"> --- </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="se">\\</span><span class="s2">par&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;         }%&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;    }%&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;    </span><span class="se">\\</span><span class="s2">vspace</span><span class="si">{2mm}</span><span class="se">\\</span><span class="s2">hrule</span><span class="se">\\</span><span class="s2">vspace</span><span class="si">{4mm}</span><span class="se">\\</span><span class="s2">par&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;  };&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Row origins: align chapter SOUTH edges to this line</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;  % Row origins: first row line sits just below the title bar&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="se">\\</span><span class="s2">coordinate (rowOrigin0) at ($ (titlebar.south west) + (0,-</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">title_gap</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">chapter_min_height</span><span class="si">}</span><span class="s2">) $);&quot;</span><span class="p">)</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">debug</span><span class="p">:</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;  </span><span class="se">\\</span><span class="s2">draw[densely dotted, gray!60] ($(rowOrigin0)+(-3mm,0)$) &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;-- ($(rowOrigin0)+(22cm,0)$);&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">current_row</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">remaining_slots</span> <span class="o">=</span> <span class="n">row_capacity</span>
+        <span class="n">last_group_node</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">last_chapter_node</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">row_group_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Emit chapters in order, using cached layout and row slot accounting</span>
+        <span class="n">ch_counter</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">ch_val</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_chapter_cache</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+            <span class="n">ch_counter</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">cache</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_chapter_cache</span><span class="p">[</span><span class="n">ch_val</span><span class="p">]</span>
+            <span class="n">slots_needed</span> <span class="o">=</span> <span class="n">cache</span><span class="p">[</span><span class="s2">&quot;slots&quot;</span><span class="p">]</span>
+            <span class="n">ch_node</span> <span class="o">=</span> <span class="n">cache</span><span class="p">[</span><span class="s2">&quot;chapter_node_name&quot;</span><span class="p">]</span>  <span class="c1"># e.g., &quot;c1-chap&quot;</span>
+            <span class="n">group_node</span> <span class="o">=</span> <span class="n">cache</span><span class="p">[</span><span class="s2">&quot;group_node_name&quot;</span><span class="p">]</span>
+            <span class="n">col_tag</span> <span class="o">=</span> <span class="n">cache</span><span class="p">[</span><span class="s2">&quot;col_tag&quot;</span><span class="p">]</span>
+            <span class="n">ch_text</span> <span class="o">=</span> <span class="n">cache</span><span class="p">[</span><span class="s2">&quot;chapter_text&quot;</span><span class="p">]</span>
+            <span class="n">section_columns</span> <span class="o">=</span> <span class="n">cache</span><span class="p">[</span><span class="s2">&quot;columns&quot;</span><span class="p">]</span>
+
+            <span class="c1"># Row break if needed by look-ahead</span>
+            <span class="k">if</span> <span class="n">remaining_slots</span> <span class="o">&lt;</span> <span class="n">slots_needed</span><span class="p">:</span>
+                <span class="c1"># close previous row</span>
+                <span class="k">if</span> <span class="n">row_group_names</span><span class="p">:</span>
+                    <span class="n">row_fit</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;rowFit</span><span class="si">{</span><span class="n">current_row</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="n">parts</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">g</span><span class="si">}</span><span class="s2">)&quot;</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">row_group_names</span><span class="p">)</span>
+                    <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  % ---- close row </span><span class="si">{</span><span class="n">current_row</span><span class="si">}</span><span class="s2"> ----&quot;</span><span class="p">)</span>
+                    <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="se">\\</span><span class="s2">node[tocRowBox, fit=</span><span class="se">{{</span><span class="s2"> </span><span class="si">{</span><span class="n">parts</span><span class="si">}</span><span class="s2"> </span><span class="se">}}</span><span class="s2">] (</span><span class="si">{</span><span class="n">row_fit</span><span class="si">}</span><span class="s2">) </span><span class="se">{{}}</span><span class="s2">;&quot;</span><span class="p">)</span>
+                    <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;  </span><span class="se">\\</span><span class="s2">coordinate (rowOrigin</span><span class="si">{</span><span class="n">current_row</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">) at ($(</span><span class="si">{</span><span class="n">row_fit</span><span class="si">}</span><span class="s2">.south west)+(0,-</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">chapter_min_height</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">row_gap</span><span class="si">}</span><span class="s2">)$);&quot;</span>
+                    <span class="p">)</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">debug</span><span class="p">:</span>
+                        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;  </span><span class="se">\\</span><span class="s2">draw[densely dotted, gray!60] ($(rowOrigin</span><span class="si">{</span><span class="n">current_row</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">)+(-3mm,0)$) &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;-- ($(rowOrigin</span><span class="si">{</span><span class="n">current_row</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">)+(22cm,0)$);&quot;</span>
+                        <span class="p">)</span>
+                    <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="n">current_row</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="n">remaining_slots</span> <span class="o">=</span> <span class="n">row_capacity</span>
+                <span class="n">last_group_node</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="n">last_chapter_node</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="n">row_group_names</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="c1"># Chapter banner comment</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">debug</span><span class="p">:</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  % =============================================================&quot;</span><span class="p">)</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  % Chapter </span><span class="si">{</span><span class="n">ch_val</span><span class="si">:</span><span class="s2">02d</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">cache</span><span class="p">[</span><span class="s1">&#39;chapter_title&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  % Estimated subcolumns: </span><span class="si">{</span><span class="n">slots_needed</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  % =============================================================&quot;</span><span class="p">)</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Place chapter header baseline-aligned.</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">last_group_node</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">last_chapter_node</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">):</span>
+                <span class="c1"># first chapter in row sits with its SOUTH edge on the row line</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;  </span><span class="se">\\</span><span class="s2">node[tocChapterBox, anchor=south west] (</span><span class="si">{</span><span class="n">ch_node</span><span class="si">}</span><span class="s2">) &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;at (rowOrigin</span><span class="si">{</span><span class="n">current_row</span><span class="si">}</span><span class="s2">) </span><span class="se">{{</span><span class="si">{</span><span class="n">ch_text</span><span class="si">}</span><span class="se">}}</span><span class="s2">;&quot;</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># x from previous GROUP&#39;s east (full width), y from current row&#39;s line</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="s2">&quot;  </span><span class="se">\\</span><span class="s2">node[tocChapterBox, anchor=south west] &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">ch_node</span><span class="si">}</span><span class="s2">) at ($(</span><span class="si">{</span><span class="n">last_group_node</span><span class="si">}</span><span class="s2">.east|-rowOrigin</span><span class="si">{</span><span class="n">current_row</span><span class="si">}</span><span class="s2">)+(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">column_gap</span><span class="si">}</span><span class="s2">,0)$) &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="se">{{</span><span class="si">{</span><span class="n">ch_text</span><span class="si">}</span><span class="se">}}</span><span class="s2">;&quot;</span>
+                <span class="p">)</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="n">last_chapter_node</span> <span class="o">=</span> <span class="n">ch_node</span>
+
+
+
+            <span class="c1"># Place section subcolumns (if any), aligned under the chapter header</span>
+            <span class="n">section_nodes</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">if</span> <span class="n">section_columns</span><span class="p">:</span>
+                <span class="n">first_col_top</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="n">prev_col_top</span> <span class="o">=</span> <span class="kc">None</span>
+
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">debug</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">ci</span><span class="p">,</span> <span class="n">col_items</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">section_columns</span><span class="p">):</span>
+                        <span class="n">heights</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">h</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">cm&quot;</span> <span class="k">for</span> <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="ow">in</span> <span class="n">col_items</span><span class="p">]</span>
+                        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  % Column </span><span class="si">{</span><span class="n">ci</span><span class="si">}</span><span class="s2"> has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">col_items</span><span class="p">)</span><span class="si">}</span><span class="s2"> sections; est heights: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">heights</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+                <span class="k">for</span> <span class="n">col_i</span><span class="p">,</span> <span class="n">col_items</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">section_columns</span><span class="p">):</span>
+                    <span class="c1"># First column starts from the chapter node&#39;s south west edge, not &quot;below=of&quot;,</span>
+                    <span class="c1"># so it&#39;s independent of the chapter text baseline and always grows downward.</span>
+                    <span class="k">if</span> <span class="n">col_i</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">start_placement</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;at ($(</span><span class="si">{</span><span class="n">ch_node</span><span class="si">}</span><span class="s2">.south west)+(0,-</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">section_top_gap</span><span class="si">}</span><span class="s2">)$)&quot;</span>
+                        <span class="n">first_anchor</span> <span class="o">=</span> <span class="s2">&quot;, anchor=north west&quot;</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">start_placement</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;at ($(</span><span class="si">{</span><span class="n">prev_col_top</span><span class="si">}</span><span class="s2">.north east)+(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">section_column_gap</span><span class="si">}</span><span class="s2">,0)$)&quot;</span>
+                        <span class="n">first_anchor</span> <span class="o">=</span> <span class="s2">&quot;, anchor=north west&quot;</span>
+
+                    <span class="n">prev_in_col</span> <span class="o">=</span> <span class="kc">None</span>
+                    <span class="n">col_top_node</span> <span class="o">=</span> <span class="kc">None</span>
+
+                    <span class="k">for</span> <span class="p">(</span><span class="n">sec_val</span><span class="p">,</span> <span class="n">node_text</span><span class="p">,</span> <span class="n">_est_h_cm</span><span class="p">,</span> <span class="n">_ord</span><span class="p">)</span> <span class="ow">in</span> <span class="n">col_items</span><span class="p">:</span>
+                        <span class="n">sec_suffix</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_safe_int_str</span><span class="p">(</span><span class="n">sec_val</span><span class="p">)</span>
+                        <span class="n">sec_node</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">col_tag</span><span class="si">}</span><span class="s2">-sec-</span><span class="si">{</span><span class="n">sec_suffix</span><span class="si">}</span><span class="s2">-col</span><span class="si">{</span><span class="n">col_i</span><span class="si">}</span><span class="s2">&quot;</span>
+
+                        <span class="k">if</span> <span class="n">prev_in_col</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                                <span class="sa">f</span><span class="s2">&quot;  </span><span class="se">\\</span><span class="s2">node[tocSectionBox</span><span class="si">{</span><span class="n">first_anchor</span><span class="si">}</span><span class="s2">] (</span><span class="si">{</span><span class="n">sec_node</span><span class="si">}</span><span class="s2">) </span><span class="si">{</span><span class="n">start_placement</span><span class="si">}</span><span class="s2"> &quot;</span>
+                                <span class="sa">f</span><span class="s2">&quot;</span><span class="se">{{</span><span class="si">{</span><span class="n">node_text</span><span class="si">}</span><span class="se">}}</span><span class="s2">; % first in column </span><span class="si">{</span><span class="n">col_i</span><span class="si">}</span><span class="s2">&quot;</span>
+                            <span class="p">)</span>
+                            <span class="n">col_top_node</span> <span class="o">=</span> <span class="n">sec_node</span>
+                            <span class="n">prev_in_col</span> <span class="o">=</span> <span class="n">sec_node</span>
+                            <span class="k">if</span> <span class="n">col_i</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                                <span class="n">first_col_top</span> <span class="o">=</span> <span class="n">sec_node</span>
+                                <span class="n">prev_col_top</span> <span class="o">=</span> <span class="n">sec_node</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                                <span class="sa">f</span><span class="s2">&quot;  </span><span class="se">\\</span><span class="s2">node[tocSectionBox] (</span><span class="si">{</span><span class="n">sec_node</span><span class="si">}</span><span class="s2">) [below=of </span><span class="si">{</span><span class="n">prev_in_col</span><span class="si">}</span><span class="s2">] &quot;</span>
+                                <span class="sa">f</span><span class="s2">&quot;</span><span class="se">{{</span><span class="si">{</span><span class="n">node_text</span><span class="si">}</span><span class="se">}}</span><span class="s2">;&quot;</span>
+                            <span class="p">)</span>
+                            <span class="n">prev_in_col</span> <span class="o">=</span> <span class="n">sec_node</span>
+
+                        <span class="n">section_nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sec_node</span><span class="p">)</span>
+
+                    <span class="k">if</span> <span class="n">col_top_node</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">prev_col_top</span> <span class="o">=</span> <span class="n">col_top_node</span>
+
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Fit node around chapter header + its sections</span>
+            <span class="n">parts</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">ch_node</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">)&quot;</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">section_nodes</span><span class="p">])</span> <span class="k">if</span> <span class="n">section_nodes</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">ch_node</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="se">\\</span><span class="s2">node[tocGroupBox, fit=</span><span class="se">{{</span><span class="s2"> </span><span class="si">{</span><span class="n">parts</span><span class="si">}</span><span class="s2"> </span><span class="se">}}</span><span class="s2">] (</span><span class="si">{</span><span class="n">group_node</span><span class="si">}</span><span class="s2">) </span><span class="se">{{}}</span><span class="s2">;&quot;</span><span class="p">)</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Update trackers for row composition</span>
+            <span class="n">remaining_slots</span> <span class="o">-=</span> <span class="n">slots_needed</span>
+            <span class="n">last_group_node</span> <span class="o">=</span> <span class="n">group_node</span>
+            <span class="n">row_group_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">group_node</span><span class="p">)</span>
+
+        <span class="c1"># Close final row neatly</span>
+        <span class="k">if</span> <span class="n">row_group_names</span><span class="p">:</span>
+            <span class="n">row_fit</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;rowFit</span><span class="si">{</span><span class="n">current_row</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">parts</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">g</span><span class="si">}</span><span class="s2">)&quot;</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">row_group_names</span><span class="p">)</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  % ---- close row </span><span class="si">{</span><span class="n">current_row</span><span class="si">}</span><span class="s2"> ----&quot;</span><span class="p">)</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="se">\\</span><span class="s2">node[tocRowBox, fit=</span><span class="se">{{</span><span class="s2"> </span><span class="si">{</span><span class="n">parts</span><span class="si">}</span><span class="s2"> </span><span class="se">}}</span><span class="s2">] (</span><span class="si">{</span><span class="n">row_fit</span><span class="si">}</span><span class="s2">) </span><span class="se">{{}}</span><span class="s2">;&quot;</span><span class="p">)</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">end</span><span class="si">{tikzpicture}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QuartoToc.write_tikz">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc.write_tikz">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">write_tikz</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">out_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span> <span class="n">chapter_number</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Write bare TikZ code to a .tex snippet file.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">tikz_code</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_tikz_toc</span><span class="p">(</span><span class="n">chapter_number</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_safe_save</span><span class="p">(</span><span class="n">out_path</span><span class="p">,</span> <span class="n">tikz_code</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QuartoToc.write_tex">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc.write_tex">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">write_tex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">out_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span> <span class="n">chapter_number</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Wrap the TikZ picture into a standalone LuaLaTeX document and save.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">tikz_code</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_tikz_toc</span><span class="p">(</span><span class="n">chapter_number</span><span class="p">)</span>
+        <span class="n">tex_code</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_wrap_tikz_to_tex</span><span class="p">(</span><span class="n">tikz_code</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_safe_save</span><span class="p">(</span><span class="n">out_path</span><span class="p">,</span> <span class="n">tex_code</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QuartoToc.run_lualatex">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc.run_lualatex">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_lualatex</span><span class="p">(</span><span class="n">tex_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Run lualatex on tex_path and stream stdout/stderr.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="p">[</span><span class="s2">&quot;lualatex&quot;</span><span class="p">,</span> <span class="s2">&quot;-interaction=nonstopmode&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">tex_path</span><span class="p">)],</span>
+            <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+            <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">STDOUT</span><span class="p">,</span>
+            <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+    <span class="c1"># ---------- Helpers ----------</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_is_int_like</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_safe_int_str</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+<div class="viewcode-block" id="QuartoToc._cm_from">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc._cm_from">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_cm_from</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">spec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">default_cm</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parse &#39;&lt;num&gt;cm&#39; or &#39;&lt;num&gt;mm&#39; into centimeters; fallback to default_cm.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">spec</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">default_cm</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\s*([\d.]+)\s*(cm|mm)\s*&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">spec</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">m</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">default_cm</span>
+        <span class="n">val</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">val</span> <span class="k">if</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;cm&quot;</span> <span class="k">else</span> <span class="n">val</span> <span class="o">/</span> <span class="mf">10.0</span></div>
+
+
+<div class="viewcode-block" id="QuartoToc._estimate_lines">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc._estimate_lines">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_estimate_lines</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">width_cm</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">chars_per_cm</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Rough line-count estimator given width and average characters per cm.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">text</span><span class="p">)</span> <span class="o">/</span> <span class="nb">max</span><span class="p">(</span><span class="mf">1e-6</span><span class="p">,</span> <span class="n">chars_per_cm</span> <span class="o">*</span> <span class="n">width_cm</span><span class="p">)))</span></div>
+
+
+<div class="viewcode-block" id="QuartoToc._estimate_section_height_cm">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc._estimate_section_height_cm">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_estimate_section_height_cm</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sec_title</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">subs_text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">width_cm</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Rough section-node height estimate in cm, combining title and inline subsections.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># title</span>
+        <span class="n">title_lines</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_estimate_lines</span><span class="p">(</span><span class="n">sec_title</span><span class="p">,</span> <span class="n">width_cm</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">chars_per_cm_title</span><span class="p">)</span>
+        <span class="n">h_title_pt</span> <span class="o">=</span> <span class="n">title_lines</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">baseline_norm_pt</span>
+
+        <span class="c1"># subs</span>
+        <span class="k">if</span> <span class="n">subs_text</span><span class="p">:</span>
+            <span class="n">subs_lines</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_estimate_lines</span><span class="p">(</span><span class="n">subs_text</span><span class="p">,</span> <span class="n">width_cm</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">chars_per_cm_subs</span><span class="p">)</span>
+            <span class="n">h_subs_pt</span> <span class="o">=</span> <span class="n">subs_lines</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">baseline_subs_pt</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">subs_linespread</span>
+            <span class="n">h_gap_pt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">gap_pt</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">h_subs_pt</span> <span class="o">=</span> <span class="mf">0.0</span>
+            <span class="n">h_gap_pt</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+        <span class="n">h_pad_pt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">inner_sep_section_pt</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">h_title_pt</span> <span class="o">+</span> <span class="n">h_gap_pt</span> <span class="o">+</span> <span class="n">h_subs_pt</span> <span class="o">+</span> <span class="n">h_pad_pt</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.03514598</span>  <span class="c1"># pt -&gt; cm</span></div>
+
+
+<div class="viewcode-block" id="QuartoToc._estimate_chapter_min_height_cm">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc._estimate_chapter_min_height_cm">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_estimate_chapter_min_height_cm</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">titles</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Estimate min-height for \\large chapter nodes and return as &#39;&lt;X&gt;cm&#39;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\s*([\d.]+)\s*cm\s*&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">column_width</span><span class="p">)</span>
+        <span class="n">width_cm</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span> <span class="k">if</span> <span class="n">m</span> <span class="k">else</span> <span class="mf">5.0</span>
+        <span class="n">max_lines</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">titles</span><span class="p">:</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">chars_per_cm_title</span> <span class="o">*</span> <span class="n">width_cm</span><span class="p">)))</span>
+            <span class="n">max_lines</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">max_lines</span><span class="p">,</span> <span class="n">n</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">top_prefix_lines</span><span class="p">)</span>
+        <span class="n">height_pt</span> <span class="o">=</span> <span class="n">max_lines</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">baseline_large_pt</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">padding_pt</span>
+        <span class="n">height_cm</span> <span class="o">=</span> <span class="n">height_pt</span> <span class="o">*</span> <span class="mf">0.03514598</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">height_cm</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">1.08</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">cm&quot;</span></div>
+
+
+<div class="viewcode-block" id="QuartoToc._escape_latex">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc._escape_latex">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_escape_latex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Escape LaTeX specials for safe node text.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">trust_tex</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_markdown_to_tex</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+            <span class="c1"># return s</span>
+        <span class="n">out</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">ch</span> <span class="ow">in</span> <span class="n">s</span><span class="p">:</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">LATEX_SPECIALS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ch</span><span class="p">,</span> <span class="n">ch</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QuartoToc._wrap_tikz_to_tex">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc._wrap_tikz_to_tex">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_wrap_tikz_to_tex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tikz</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Wrap the TikZ picture into a minimal standalone LuaLaTeX document,</span>
+<span class="sd">        with a top title bar: left = self.title, right = ISO datetime on top,</span>
+<span class="sd">        and &#39;commit --- state&#39; beneath, flush right.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">tex</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span><span class="se">\\</span><span class="s2">documentclass[10pt, border=5mm]</span><span class="se">{{</span><span class="s2">standalone</span><span class="se">}}</span>
+
+<span class="s2">% LuaLaTeX fonts</span>
+<span class="se">\\</span><span class="s2">usepackage</span><span class="se">{{</span><span class="s2">fontspec</span><span class="se">}}</span>
+<span class="se">\\</span><span class="s2">setmainfont</span><span class="se">{{</span><span class="s2">Stix Two Text</span><span class="se">}}</span>
+<span class="se">\\</span><span class="s2">usepackage</span><span class="se">{{</span><span class="s2">unicode-math</span><span class="se">}}</span>
+<span class="se">\\</span><span class="s2">setmathfont</span><span class="se">{{</span><span class="s2">Stix Two Math</span><span class="se">}}</span>
+
+<span class="se">\\</span><span class="s2">usepackage</span><span class="se">{{</span><span class="s2">xcolor</span><span class="se">}}</span>
+<span class="se">\\</span><span class="s2">usepackage</span><span class="se">{{</span><span class="s2">url</span><span class="se">}}</span>
+
+<span class="s2">% TikZ</span>
+<span class="se">\\</span><span class="s2">usepackage</span><span class="se">{{</span><span class="s2">tikz</span><span class="se">}}</span>
+<span class="se">\\</span><span class="s2">usetikzlibrary</span><span class="se">{{</span><span class="s2">calc,positioning,fit</span><span class="se">}}</span>
+
+<span class="s2">% small helpers</span>
+<span class="se">\\</span><span class="s2">newcommand</span><span class="se">{{\\</span><span class="s2">I</span><span class="se">}}{{\\</span><span class="s2">vphantom</span><span class="se">{{</span><span class="s2">lp</span><span class="se">}}}}</span>
+
+<span class="se">\\</span><span class="s2">begin</span><span class="se">{{</span><span class="s2">document</span><span class="se">}}</span>
+
+<span class="si">{</span><span class="n">tikz</span><span class="si">}</span>
+
+<span class="se">\\</span><span class="s2">end</span><span class="se">{{</span><span class="s2">document</span><span class="se">}}</span>
+<span class="s2">&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">tex</span></div>
+
+
+<div class="viewcode-block" id="QuartoToc._safe_save">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc._safe_save">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_safe_save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">out_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Ensure parent dir exists and write UTF-8 text.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">out_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">out_path</span> <span class="o">=</span> <span class="n">p</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span></div>
+
+
+    <span class="c1"># ---------- Column packing ----------</span>
+
+<div class="viewcode-block" id="QuartoToc._columns_by_height">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc._columns_by_height">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_columns_by_height</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">items</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">]],</span> <span class="n">cap_cm</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;stable&quot;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Partition (sec_val, node_text, est_h_cm, order_idx) into subcolumns.</span>
+
+<span class="sd">        mode:</span>
+<span class="sd">          - &quot;stable&quot;: keep original order; wrap to next column when cap exceeded.</span>
+<span class="sd">          - &quot;ffd&quot;:    first-fit decreasing by height, then restore original order within each column.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">items</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[[]]</span>
+
+        <span class="k">if</span> <span class="n">cap_cm</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">math</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">cap_cm</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">[</span><span class="nb">sorted</span><span class="p">(</span><span class="n">items</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">t</span><span class="p">[</span><span class="mi">3</span><span class="p">])]</span>
+
+        <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;ffd&quot;</span><span class="p">:</span>
+            <span class="n">total</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">h</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">items</span><span class="p">)</span>
+            <span class="n">k</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">total</span> <span class="o">/</span> <span class="n">cap_cm</span><span class="p">))</span>
+            <span class="n">cols</span> <span class="o">=</span> <span class="p">[[]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">k</span><span class="p">)]</span>
+            <span class="n">heights</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">]</span> <span class="o">*</span> <span class="n">k</span>
+            <span class="k">for</span> <span class="n">it</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">items</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">t</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+                <span class="n">j</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">k</span><span class="p">),</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">c</span><span class="p">:</span> <span class="n">heights</span><span class="p">[</span><span class="n">c</span><span class="p">])</span>
+                <span class="n">cols</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+                <span class="n">heights</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">+=</span> <span class="n">it</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+            <span class="k">return</span> <span class="p">[</span><span class="nb">sorted</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">t</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">cols</span><span class="p">]</span>
+
+        <span class="c1"># stable greedy wrap</span>
+        <span class="n">cols</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">cur</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="k">for</span> <span class="n">it</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">items</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">t</span><span class="p">[</span><span class="mi">3</span><span class="p">]):</span>
+            <span class="n">est</span> <span class="o">=</span> <span class="n">it</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">cur</span> <span class="ow">and</span> <span class="n">h</span> <span class="o">+</span> <span class="n">est</span> <span class="o">&gt;</span> <span class="n">cap_cm</span><span class="p">:</span>
+                <span class="n">cols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cur</span><span class="p">)</span>
+                <span class="n">cur</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="p">[],</span> <span class="mf">0.0</span>
+            <span class="n">cur</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+            <span class="n">h</span> <span class="o">+=</span> <span class="n">est</span>
+        <span class="k">if</span> <span class="n">cur</span><span class="p">:</span>
+            <span class="n">cols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cur</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cols</span></div>
+
+
+    <span class="c1"># ---------- Chapter look-ahead ----------</span>
+
+<div class="viewcode-block" id="QuartoToc._compute_chapter_layout">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc._compute_chapter_layout">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_chapter_layout</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ch_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">ch_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">chapter_number</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compute and cache a chapter&#39;s:</span>
+<span class="sd">          - chapter header text,</span>
+<span class="sd">          - per-section display text and height estimates,</span>
+<span class="sd">          - subcolumn packing and &#39;slots&#39; needed,</span>
+<span class="sd">          - stable names for nodes to refer to during emission.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">col_tag</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;c</span><span class="si">{</span><span class="n">ch_idx</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">ch_node</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">col_tag</span><span class="si">}</span><span class="s2">-chap&quot;</span>
+        <span class="n">group_node</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">col_tag</span><span class="si">}</span><span class="s2">-group&quot;</span>
+
+        <span class="c1"># Chapter title</span>
+        <span class="c1"># ch_title_row = ch_df[ch_df[self.section_col].isna() &amp; ch_df[self.subsection_col].isna()]</span>
+        <span class="c1"># chapter_title = (</span>
+        <span class="c1">#     self._escape_latex(ch_title_row.iloc[0][self.title_col])</span>
+        <span class="c1">#     if not ch_title_row.empty</span>
+        <span class="c1">#     else self._escape_latex(ch_df.iloc[0][self.title_col])</span>
+        <span class="c1"># )</span>
+        <span class="n">hdr</span> <span class="o">=</span> <span class="n">ch_df</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s2">&quot;level == 1&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">hdr</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="n">raw_title</span> <span class="o">=</span> <span class="n">hdr</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="bp">self</span><span class="o">.</span><span class="n">title_col</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">raw_title</span> <span class="o">=</span> <span class="n">ch_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="bp">self</span><span class="o">.</span><span class="n">title_col</span><span class="p">]</span>  <span class="c1"># fallback</span>
+        <span class="n">chapter_title</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_markdown_to_tex</span><span class="p">(</span><span class="n">raw_title</span><span class="p">)</span>
+        <span class="n">ch_prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;Sec&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">chapter_number</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;Ch&#39;</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">ch_idx</span><span class="si">:</span><span class="s2">02d</span><span class="si">}</span><span class="se">\\\\</span><span class="s2"> &quot;</span> <span class="k">if</span> <span class="n">ch_idx</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="s2">&quot;</span><span class="se">\\\\</span><span class="s2"> &quot;</span>
+        <span class="n">ch_text</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ch_prefix</span><span class="si">}</span><span class="se">\\</span><span class="s2">large</span><span class="se">\\</span><span class="s2">bfseries </span><span class="si">{</span><span class="n">chapter_title</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="c1"># Sections for this chapter - this is where we use 0-&gt;n/a for ignored sections</span>
+        <span class="n">body</span> <span class="o">=</span> <span class="n">ch_df</span><span class="p">[</span><span class="n">ch_df</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">section_col</span><span class="p">]</span><span class="o">.</span><span class="n">notna</span><span class="p">()]</span>
+        <span class="n">section_columns</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">body</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="n">sections</span> <span class="o">=</span> <span class="p">[(</span><span class="n">sec_val</span><span class="p">,</span> <span class="n">grp</span><span class="p">)</span> <span class="k">for</span> <span class="n">sec_val</span><span class="p">,</span> <span class="n">grp</span> <span class="ow">in</span> <span class="n">body</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">section_col</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">False</span><span class="p">)]</span>
+            <span class="n">width_cm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cm_from</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">column_width</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">)</span>
+            <span class="n">cap_cm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cm_from</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">section_max_height</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">inf</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">section_max_height</span> <span class="k">else</span> <span class="n">math</span><span class="o">.</span><span class="n">inf</span>
+
+            <span class="c1"># do not number for prefix - ch 0</span>
+            <span class="n">numbered_sections</span> <span class="o">=</span> <span class="p">(</span><span class="n">ch_idx</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+
+            <span class="n">sec_items</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">ord_idx</span><span class="p">,</span> <span class="p">(</span><span class="n">sec_val</span><span class="p">,</span> <span class="n">sec_block</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">sections</span><span class="p">):</span>
+                <span class="n">sec_title_row</span> <span class="o">=</span> <span class="n">sec_block</span><span class="p">[</span><span class="n">sec_block</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">subsection_col</span><span class="p">]</span><span class="o">.</span><span class="n">isna</span><span class="p">()]</span>
+                <span class="n">sec_title</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_escape_latex</span><span class="p">(</span><span class="n">sec_title_row</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="bp">self</span><span class="o">.</span><span class="n">title_col</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">sec_title_row</span><span class="o">.</span><span class="n">empty</span>
+                    <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">_escape_latex</span><span class="p">(</span><span class="n">sec_block</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="bp">self</span><span class="o">.</span><span class="n">title_col</span><span class="p">])</span>
+                <span class="p">)</span>
+
+                <span class="c1"># label prefix per rule</span>
+                <span class="n">label</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ch_idx</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_safe_int_str</span><span class="p">(</span><span class="n">sec_val</span><span class="p">)</span><span class="si">}</span><span class="s2"> &quot;</span> <span class="k">if</span> <span class="n">numbered_sections</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+
+                <span class="n">subs</span> <span class="o">=</span> <span class="n">sec_block</span><span class="p">[</span><span class="n">sec_block</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">subsection_col</span><span class="p">]</span><span class="o">.</span><span class="n">notna</span><span class="p">()]</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">subs</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="mi">1</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_levels</span> <span class="o">&lt;=</span> <span class="mi">3</span><span class="p">:</span>
+                        <span class="n">bullets</span> <span class="o">=</span> <span class="s2">&quot; $</span><span class="se">\\</span><span class="s2">bullet$ &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_escape_latex</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">subs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">title_col</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="c1"># includes level 4, want different treatment</span>
+                        <span class="c1"># Split into level-3 and level-4; preserve original row order</span>
+                        <span class="n">lvl3</span> <span class="o">=</span> <span class="n">subs</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s2">&quot;level == 3&quot;</span><span class="p">)</span>
+                        <span class="n">lvl4</span> <span class="o">=</span> <span class="n">subs</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s2">&quot;level == 4&quot;</span><span class="p">)</span>
+
+                        <span class="n">bullet_parts</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+                        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">row3</span> <span class="ow">in</span> <span class="n">lvl3</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+                            <span class="n">sub_id</span> <span class="o">=</span> <span class="n">row3</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">subsection_col</span><span class="p">]</span>
+
+                            <span class="c1"># main level-3 title</span>
+                            <span class="n">txt3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_escape_latex</span><span class="p">(</span><span class="n">row3</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">title_col</span><span class="p">])</span>
+
+                            <span class="c1"># any level-4 children with the same subsection id, in original order</span>
+                            <span class="n">children</span> <span class="o">=</span> <span class="n">lvl4</span><span class="p">[</span><span class="n">lvl4</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">subsection_col</span><span class="p">]</span> <span class="o">==</span> <span class="n">sub_id</span><span class="p">][</span><span class="bp">self</span><span class="o">.</span><span class="n">title_col</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+                            <span class="k">if</span> <span class="n">children</span><span class="p">:</span>
+                                <span class="n">child_str</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_escape_latex</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">children</span><span class="p">)</span>
+                                <span class="n">txt3</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">txt3</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">child_str</span><span class="si">}</span><span class="s2">)&quot;</span>
+
+                            <span class="n">bullet_parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">txt3</span><span class="p">)</span>
+
+                        <span class="c1"># final bullet string for this section</span>
+                        <span class="n">bullets</span> <span class="o">=</span> <span class="s2">&quot; $</span><span class="se">\\</span><span class="s2">bullet$ &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">bullet_parts</span><span class="p">)</span>
+
+                    <span class="c1"># write out, tight, sans, italic, explicit fontsize to stabilize baseline skips</span>
+                    <span class="n">tight</span> <span class="o">=</span> <span class="s2">&quot;{</span><span class="se">\\</span><span class="s2">fontsize</span><span class="si">{8}{6.0}</span><span class="se">\\</span><span class="s2">selectfont</span><span class="se">\\</span><span class="s2">rmfamily</span><span class="se">\\</span><span class="s2">itshape &quot;</span> <span class="o">+</span> <span class="n">bullets</span> <span class="o">+</span> <span class="s2">&quot;}&quot;</span>
+                    <span class="n">node_text</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">sec_title</span><span class="si">}</span><span class="se">\\\\</span><span class="s2">[1pt]</span><span class="si">{</span><span class="n">tight</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="n">subs_text</span> <span class="o">=</span> <span class="n">bullets</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">node_text</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">sec_title</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="n">subs_text</span> <span class="o">=</span> <span class="kc">None</span>
+
+                <span class="n">est_h_cm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_estimate_section_height_cm</span><span class="p">(</span><span class="n">sec_title</span><span class="p">,</span> <span class="n">subs_text</span><span class="p">,</span> <span class="n">width_cm</span><span class="p">)</span>
+                <span class="n">sec_items</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="nb">str</span><span class="p">(</span><span class="n">sec_val</span><span class="p">),</span> <span class="n">node_text</span><span class="p">,</span> <span class="n">est_h_cm</span><span class="p">,</span> <span class="n">ord_idx</span><span class="p">))</span>
+
+            <span class="n">section_columns</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_columns_by_height</span><span class="p">(</span><span class="n">sec_items</span><span class="p">,</span> <span class="n">cap_cm</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">balance_mode</span><span class="p">)</span>
+
+        <span class="c1"># How many subcolumns (slots) does this chapter need?</span>
+        <span class="n">slots</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">section_columns</span><span class="p">))</span> <span class="k">if</span> <span class="n">section_columns</span> <span class="k">else</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;chapter_index&quot;</span><span class="p">:</span> <span class="n">ch_idx</span><span class="p">,</span>
+            <span class="s2">&quot;chapter_title&quot;</span><span class="p">:</span> <span class="n">chapter_title</span><span class="p">,</span>
+            <span class="s2">&quot;chapter_text&quot;</span><span class="p">:</span> <span class="n">ch_text</span><span class="p">,</span>
+            <span class="s2">&quot;columns&quot;</span><span class="p">:</span> <span class="n">section_columns</span><span class="p">,</span>
+            <span class="s2">&quot;slots&quot;</span><span class="p">:</span> <span class="n">slots</span><span class="p">,</span>
+            <span class="s2">&quot;group_node_name&quot;</span><span class="p">:</span> <span class="n">group_node</span><span class="p">,</span>
+            <span class="s2">&quot;chapter_node_name&quot;</span><span class="p">:</span> <span class="n">ch_node</span><span class="p">,</span>
+            <span class="s2">&quot;col_tag&quot;</span><span class="p">:</span> <span class="n">col_tag</span><span class="p">,</span>
+        <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="QuartoToc._now_iso">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc._now_iso">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_now_iso</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Current local datetime formatted as ISO &#39;YYYY-MM-DD HH:MM:SS&#39;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+        <span class="k">return</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2"> %H:%M:%S&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QuartoToc._markdown_to_tex">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc._markdown_to_tex">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_markdown_to_tex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Convert minimal Markdown syntax to TeX equivalents for headings:</span>
+<span class="sd">          **bold** → \\textbf{...}</span>
+<span class="sd">          *italic* or _italic_ → \\textit{...}</span>
+<span class="sd">          `code` → \\texttt{...}</span>
+<span class="sd">        Leaves existing TeX ($...$, \\mathsf{}, etc.) untouched.</span>
+<span class="sd">        Escapes only dangerous specials outside math mode.</span>
+
+<span class="sd">        This is quite tricky! The protect_math stores math in a dict,</span>
+<span class="sd">        then adjusts, then puts back.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">text</span>
+
+        <span class="c1"># protect inline math $...$ and LaTeX commands \foo</span>
+        <span class="n">math_spans</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">protect_math</span><span class="p">(</span><span class="n">m</span><span class="p">):</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;@@M</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">math_spans</span><span class="p">)</span><span class="si">}</span><span class="s2">@@&quot;</span>
+            <span class="n">math_spans</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">key</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\$[^$]+\$&quot;</span><span class="p">,</span> <span class="n">protect_math</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
+
+        <span class="c1"># basic markdown replacements</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\*\*([^*]+)\*\*&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">textbf{\1}&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>   <span class="c1"># **bold**</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\*([^*]+)\*&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">textit{\1}&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>       <span class="c1"># *italic*</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;_([^_]+)_&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">textit{\1}&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>         <span class="c1"># _italic_</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;`([^`]+)`&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">texttt{\1}&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>         <span class="c1"># `code`</span>
+
+        <span class="c1"># escape specials that are still unprotected</span>
+        <span class="n">specials</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;&amp;&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\&amp;&quot;</span><span class="p">,</span> <span class="s2">&quot;%&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\%&quot;</span><span class="p">,</span> <span class="s2">&quot;#&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\#&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\_&quot;</span><span class="p">,</span>  <span class="c1"># underscore if not italics marker</span>
+            <span class="c1"># &quot;{&quot;: r&quot;\{&quot;, &quot;}&quot;: r&quot;\}&quot;,</span>
+            <span class="s2">&quot;~&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\textasciitilde</span><span class="si">{}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;^&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\textasciicircum</span><span class="si">{}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">specials</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ch</span><span class="p">,</span> <span class="n">ch</span><span class="p">)</span> <span class="k">for</span> <span class="n">ch</span> <span class="ow">in</span> <span class="n">s</span><span class="p">)</span>
+
+        <span class="c1"># restore math spans</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">math_spans</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">s</span></div>
+
+
+
+<div class="viewcode-block" id="QuartoToc._parse_file">
+<a class="viewcode-back" href="../../api.html#quarto_tools.toc.QuartoToc._parse_file">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_parse_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parse a single QMD file:</span>
+<span class="sd">          - extract optional front-matter title,</span>
+<span class="sd">          - collect headings (raw level, title, refs, order_in_file) from body.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+        <span class="n">doc_title</span><span class="p">,</span> <span class="n">body_lines</span><span class="p">,</span> <span class="n">_meta</span> <span class="o">=</span> <span class="n">extract_front_matter</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+        <span class="n">body_lines</span> <span class="o">=</span> <span class="n">strip_code_blocks</span><span class="p">(</span><span class="n">body_lines</span><span class="p">)</span>
+
+        <span class="n">rec</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^(?&lt;!#\|)(#{1,}) (.*?)(?:$| (\{.*\})$)&quot;</span><span class="p">)</span>
+
+        <span class="n">headings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">body_lines</span><span class="p">:</span>
+            <span class="n">m</span> <span class="o">=</span> <span class="n">rec</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">m</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">level_marks</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="n">refs</span> <span class="o">=</span> <span class="n">m</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">m</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">m</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+            <span class="n">level</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">level_marks</span><span class="p">)</span>
+            <span class="n">clean_refs</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">refs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">clean_refs</span> <span class="o">=</span> <span class="n">refs</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">headings</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">level</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="n">clean_refs</span><span class="p">,</span> <span class="n">order</span><span class="p">))</span>
+            <span class="n">order</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="n">doc_title</span><span class="p">,</span> <span class="n">headings</span></div>
+</div>
+
+
+
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Stephen J. Mildenhall.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

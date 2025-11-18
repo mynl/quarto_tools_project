@@ -1,0 +1,1532 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>quarto_tools.cli &mdash; quarto_tools  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            quarto_tools
+              <img src="../../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">quarto_tools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">quarto_tools.cli</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for quarto_tools.cli</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">quarto_tools command line interface.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shlex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">click</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">prompt_toolkit</span><span class="w"> </span><span class="kn">import</span> <span class="n">PromptSession</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">prompt_toolkit.completion</span><span class="w"> </span><span class="kn">import</span> <span class="n">FuzzyCompleter</span><span class="p">,</span> <span class="n">NestedCompleter</span><span class="p">,</span> <span class="n">PathCompleter</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">prompt_toolkit.formatted_text</span><span class="w"> </span><span class="kn">import</span> <span class="n">HTML</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">greater_tables</span><span class="w"> </span><span class="kn">import</span> <span class="n">GT</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_quarto_context</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.toc</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuartoToc</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.bibtex</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuartoBibTex</span><span class="p">,</span> <span class="n">parse_bibtex_text</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.xref</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuartoXRefs</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.tidy</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuartoTidy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.pytest_qmd</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuartoPyTest</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.consolidate</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuartoConsolidate</span>
+
+
+<span class="c1"># helpers ===================================================================</span>
+<span class="c1"># this should be in utils?</span>
+<div class="viewcode-block" id="qd">
+<a class="viewcode-back" href="../../api.html#quarto_tools.cli.qd">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">qd</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;click enabled suitable quick display method.&quot;&quot;&quot;</span>
+    <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;show_index&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span> <span class="o">|</span> <span class="n">kwargs</span>
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="n">GT</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="_run_qt_line">
+<a class="viewcode-back" href="../../api.html#quarto_tools.cli._run_qt_line">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_qt_line</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">click</span><span class="o">.</span><span class="n">Context</span><span class="p">,</span> <span class="n">line</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">prog_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;qt uber&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Parse a single qt command line and dispatch it through the main click group.</span>
+
+<span class="sd">    Empty lines and comment-only lines (starting with &#39;#&#39;) are ignored.</span>
+<span class="sd">    Any click.SystemExit exceptions are caught so one bad command does not</span>
+<span class="sd">    terminate an uber or script session.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">line</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;#&quot;</span><span class="p">):</span>
+        <span class="k">return</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="n">shlex</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not parse line: </span><span class="si">{</span><span class="n">line</span><span class="si">!r}</span><span class="s2"> (</span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="n">debug</span><span class="p">:</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Executing: </span><span class="si">{</span><span class="n">args</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># entry is your main click group</span>
+        <span class="n">entry</span><span class="o">.</span><span class="n">main</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">,</span> <span class="n">prog_name</span><span class="o">=</span><span class="n">prog_name</span><span class="p">,</span> <span class="n">obj</span><span class="o">=</span><span class="n">ctx</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">SystemExit</span><span class="p">:</span>
+        <span class="c1"># swallow click&#39;s SystemExit so the REPL/script keeps running</span>
+        <span class="k">if</span> <span class="n">debug</span><span class="p">:</span>
+            <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;Command raised SystemExit (ignored).&quot;</span><span class="p">)</span></div>
+
+
+
+
+<span class="c1"># main entry point ==========================================================</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">group</span><span class="p">()</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">entry</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;CLI for quarto_tools.&quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+
+
+<span class="c1"># toc: table of contents ====================================================</span>
+<span class="nd">@entry</span><span class="o">.</span><span class="n">command</span><span class="p">()</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span>
+    <span class="s2">&quot;input_path&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s2">&quot;output_file&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">dir_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">))</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-f&quot;</span><span class="p">,</span> <span class="s2">&quot;--file&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;explicit_files&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Explicit .qmd file(s) to include; may be given multiple times.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-c&quot;</span><span class="p">,</span> <span class="s2">&quot;--max-columns-per-row&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Maximum total subcolumns per row before wrapping.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-w&quot;</span><span class="p">,</span> <span class="s2">&quot;--column-width&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;5cm&quot;</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Width of each chapter columnm.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-h&quot;</span><span class="p">,</span> <span class="s2">&quot;--section-max-height&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;8cm&quot;</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Max subcolumn height (e.g., 8cm); set to a small value to force more wrapping.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-m&quot;</span><span class="p">,</span> <span class="s2">&quot;--chapter-min-height&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Min height of chapter box; auto or 2cm etc.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-v&quot;</span><span class="p">,</span> <span class="s2">&quot;--max-levels&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Number of levels in TOC, -1 for all levels (default).&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-u&quot;</span><span class="p">,</span> <span class="s2">&quot;--up-level/--no-up-level&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Apply up-leveling logic.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-b&quot;</span><span class="p">,</span> <span class="s2">&quot;--balance-mode&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Choice</span><span class="p">([</span><span class="s2">&quot;stable&quot;</span><span class="p">,</span> <span class="s2">&quot;ffd&quot;</span><span class="p">]),</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;stable&quot;</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Subcolumn packing strategy.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-n&quot;</span><span class="p">,</span> <span class="s2">&quot;--chapter-number&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;TOC for chapter number only (promote chapter to book), more detailed toc for individual chapter; default -1 use whole book.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-o&quot;</span><span class="p">,</span> <span class="s2">&quot;--omit&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Titles to ignore (may be given multiple times).&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-g&quot;</span><span class="p">,</span> <span class="s2">&quot;--pattern&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;file_patterns&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Glob pattern(s) for QMD files relative to INPUT_PATH when it is a directory, like ripgrep -g, can be given multiple times.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-x&quot;</span><span class="p">,</span> <span class="s2">&quot;--execute/--no-execute&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Execute LaTeX command to build pdf. Default is no execution.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--messy/tidy&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Do not tidy up log and aux files after TeX build. Default is not to be messy.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-s&quot;</span><span class="p">,</span> <span class="s2">&quot;--svg&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;If execute, then also create svg file from PDF. Default is no svg.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-d&quot;</span><span class="p">,</span> <span class="s2">&quot;--debug/--no-debug&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Emit extra comments and faint node outlines.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">toc</span><span class="p">(</span>
+    <span class="n">input_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">output_file</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">explicit_files</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">max_columns_per_row</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">column_width</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">section_max_height</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">chapter_min_height</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">max_levels</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">up_level</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">balance_mode</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">chapter_number</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">omit</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">file_patterns</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">execute</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">messy</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">svg</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate a TikZ TOC from INPUT_PATH and write a standalone TEX file to OUTPUT_FILE.</span>
+
+<span class="sd">    INPUT_PATH may be:</span>
+
+<span class="sd">    \b</span>
+<span class="sd">    - a Quarto project directory (with _quarto.yml / _quarto.yaml),</span>
+<span class="sd">    - a single .qmd file,</span>
+<span class="sd">    - a _quarto.yml / _quarto.yaml file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Decide how to interpret INPUT_PATH</span>
+    <span class="n">base_dir</span><span class="p">,</span> <span class="n">project_yaml</span><span class="p">,</span> <span class="n">patterns</span><span class="p">,</span> <span class="n">explicit_files</span> <span class="o">=</span> <span class="n">resolve_quarto_context</span><span class="p">(</span>
+        <span class="n">input_path</span><span class="o">=</span><span class="n">input_path</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">file_patterns</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">toc</span> <span class="o">=</span> <span class="n">QuartoToc</span><span class="p">(</span>
+        <span class="n">base_dir</span><span class="o">=</span><span class="n">base_dir</span><span class="p">,</span>
+        <span class="n">project_yaml</span><span class="o">=</span><span class="n">project_yaml</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">patterns</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">max_columns_per_row</span><span class="o">=</span><span class="n">max_columns_per_row</span><span class="p">,</span>
+        <span class="n">column_width</span><span class="o">=</span><span class="n">column_width</span><span class="p">,</span>
+        <span class="n">section_max_height</span><span class="o">=</span><span class="n">section_max_height</span><span class="p">,</span>
+        <span class="n">chapter_min_height</span><span class="o">=</span><span class="n">chapter_min_height</span><span class="p">,</span>
+        <span class="n">max_levels</span><span class="o">=</span><span class="n">max_levels</span><span class="p">,</span>
+        <span class="n">up_level</span><span class="o">=</span><span class="n">up_level</span><span class="p">,</span>
+        <span class="n">balance_mode</span><span class="o">=</span><span class="n">balance_mode</span><span class="p">,</span>
+        <span class="n">omit_titles</span><span class="o">=</span><span class="nb">set</span><span class="p">(</span><span class="n">omit</span><span class="p">)</span> <span class="k">if</span> <span class="n">omit</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">toc</span><span class="o">.</span><span class="n">write_tex</span><span class="p">(</span><span class="n">output_file</span><span class="p">,</span> <span class="n">chapter_number</span><span class="p">)</span>
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Wrote </span><span class="si">{</span><span class="n">output_file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">execute</span><span class="p">:</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">toc</span><span class="o">.</span><span class="n">run_lualatex</span><span class="p">(</span><span class="n">output_file</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s1">&#39;Built TeX file to PDF&#39;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">execute</span> <span class="ow">and</span> <span class="n">svg</span> <span class="ow">and</span> <span class="p">(</span><span class="n">pdf_file</span><span class="o">:=</span><span class="n">output_file</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s1">&#39;.pdf&#39;</span><span class="p">))</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="n">svg_file</span> <span class="o">=</span> <span class="n">output_file</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s1">&#39;.svg&#39;</span><span class="p">)</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="p">[</span><span class="s2">&quot;pdf2svg&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">pdf_file</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">svg_file</span><span class="p">)],</span>
+            <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+            <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">STDOUT</span><span class="p">,</span>
+            <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s1">&#39;Converted PDF to SVG&#39;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+
+<span class="c1"># bibtex  ====================================================</span>
+<span class="c1"># bibtex: citations and references ===========================================</span>
+<span class="nd">@entry</span><span class="o">.</span><span class="n">command</span><span class="p">()</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span>
+    <span class="s2">&quot;input_path&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-f&quot;</span><span class="p">,</span> <span class="s2">&quot;--file&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;explicit_files&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Explicit QMD files to include; may be given multiple times.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-g&quot;</span><span class="p">,</span> <span class="s2">&quot;--pattern&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;file_patterns&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Glob pattern(s) for QMD files relative to INPUT_PATH, like ripgrep -g.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-w&quot;</span><span class="p">,</span> <span class="s2">&quot;--write-csv&quot;</span><span class="p">,</span>
+    <span class="n">is_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Write citation and bib-entry CSV files alongside the project root.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-o&quot;</span><span class="p">,</span> <span class="s2">&quot;--out-prefix&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;quarto_bibtex&quot;</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Filename prefix for CSV outputs (without extension).&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--fail-on-error&quot;</span><span class="p">,</span>
+    <span class="n">is_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Exit with non-zero status if mismatches are found.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">bibtex</span><span class="p">(</span>
+    <span class="n">input_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">explicit_files</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">file_patterns</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">write_csv</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">out_prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">fail_on_error</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Scan a Quarto project for citations and BibTeX entries and report issues.</span>
+
+<span class="sd">    INPUT_PATH may be:</span>
+
+<span class="sd">    \b</span>
+<span class="sd">    - a Quarto project directory (with _quarto.yml / _quarto.yaml),</span>
+<span class="sd">    - a single .qmd file,</span>
+<span class="sd">    - a _quarto.yml / _quarto.yaml file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">base_dir</span><span class="p">,</span> <span class="n">project_yaml</span><span class="p">,</span> <span class="n">patterns</span><span class="p">,</span> <span class="n">explicit_files</span> <span class="o">=</span> <span class="n">resolve_quarto_context</span><span class="p">(</span>
+        <span class="n">input_path</span><span class="o">=</span><span class="n">input_path</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">file_patterns</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">qb</span> <span class="o">=</span> <span class="n">QuartoBibTex</span><span class="p">(</span>
+        <span class="n">base_dir</span><span class="o">=</span><span class="n">base_dir</span><span class="p">,</span>
+        <span class="n">project_yaml</span><span class="o">=</span><span class="n">project_yaml</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">patterns</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">sources</span> <span class="o">=</span> <span class="n">qb</span><span class="o">.</span><span class="n">_discover_sources</span><span class="p">()</span>
+    <span class="n">citation_keys</span> <span class="o">=</span> <span class="n">qb</span><span class="o">.</span><span class="n">collect_citations</span><span class="p">(</span><span class="n">sources</span><span class="p">)</span>
+    <span class="n">bib_paths</span> <span class="o">=</span> <span class="n">qb</span><span class="o">.</span><span class="n">_collect_bib_paths</span><span class="p">(</span><span class="n">sources</span><span class="p">)</span>
+
+    <span class="n">all_rows</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">bib_path</span> <span class="ow">in</span> <span class="n">bib_paths</span><span class="p">:</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="n">bib_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="n">qb</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+        <span class="n">all_rows</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">parse_bibtex_text</span><span class="p">(</span><span class="n">text</span><span class="p">))</span>
+
+    <span class="n">bib_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">all_rows</span><span class="p">)</span> <span class="k">if</span> <span class="n">all_rows</span> <span class="k">else</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">bib_df</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="s2">&quot;tag&quot;</span> <span class="ow">in</span> <span class="n">bib_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">all_tags</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">bib_df</span><span class="p">[</span><span class="s2">&quot;tag&quot;</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">all_tags</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+    <span class="n">missing_citations</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">citation_keys</span> <span class="o">-</span> <span class="n">all_tags</span><span class="p">)</span>
+    <span class="n">unused_entries</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">all_tags</span> <span class="o">-</span> <span class="n">citation_keys</span><span class="p">)</span>
+
+    <span class="n">num_cites</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">citation_keys</span><span class="p">)</span>
+    <span class="n">num_bib</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">bib_df</span><span class="p">)</span>
+    <span class="n">num_missing</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">missing_citations</span><span class="p">)</span>
+    <span class="n">num_unused</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">unused_entries</span><span class="p">)</span>
+
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Citations found  : </span><span class="si">{</span><span class="n">num_cites</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Bib entries      : </span><span class="si">{</span><span class="n">num_bib</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Missing entries  : </span><span class="si">{</span><span class="n">num_missing</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unused entries   : </span><span class="si">{</span><span class="n">num_unused</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">write_csv</span><span class="p">:</span>
+        <span class="n">out_prefix_path</span> <span class="o">=</span> <span class="n">base_dir</span> <span class="o">/</span> <span class="n">out_prefix</span>
+
+        <span class="n">cites_csv</span> <span class="o">=</span> <span class="n">out_prefix_path</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.cites.csv&quot;</span><span class="p">)</span>
+        <span class="n">bib_csv</span> <span class="o">=</span> <span class="n">out_prefix_path</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.bib.csv&quot;</span><span class="p">)</span>
+        <span class="n">missing_csv</span> <span class="o">=</span> <span class="n">out_prefix_path</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.missing.csv&quot;</span><span class="p">)</span>
+        <span class="n">unused_csv</span> <span class="o">=</span> <span class="n">out_prefix_path</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.unused.csv&quot;</span><span class="p">)</span>
+
+        <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">&quot;key&quot;</span><span class="p">:</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">citation_keys</span><span class="p">)})</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">cites_csv</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">bib_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">bib_csv</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">&quot;tag&quot;</span><span class="p">:</span> <span class="n">missing_citations</span><span class="p">})</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">missing_csv</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">&quot;tag&quot;</span><span class="p">:</span> <span class="n">unused_entries</span><span class="p">})</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">unused_csv</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;Wrote:&quot;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">cites_csv</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">bib_csv</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">missing_csv</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">unused_csv</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">fail_on_error</span> <span class="ow">and</span> <span class="p">(</span><span class="n">num_missing</span> <span class="ow">or</span> <span class="n">num_unused</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+
+<span class="c1"># @entry.command()</span>
+<span class="c1"># @click.argument(</span>
+<span class="c1">#     &quot;project_root&quot;,</span>
+<span class="c1">#     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),</span>
+<span class="c1"># )</span>
+<span class="c1"># @click.option(</span>
+<span class="c1">#     &quot;-b&quot;, &quot;--bib-out&quot;,</span>
+<span class="c1">#     type=click.Path(dir_okay=False, path_type=Path),</span>
+<span class="c1">#     required=True,</span>
+<span class="c1">#     help=&quot;Path for trimmed BibTeX file.&quot;,</span>
+<span class="c1"># )</span>
+<span class="c1"># @click.option(</span>
+<span class="c1">#     &quot;-d&quot;, &quot;--df-out&quot;,</span>
+<span class="c1">#     type=click.Path(dir_okay=False, path_type=Path),</span>
+<span class="c1">#     required=False,</span>
+<span class="c1">#     help=&quot;Path for df as csv file, written in same directory as bibfile.&quot;,</span>
+<span class="c1"># )</span>
+<span class="c1"># @click.option(</span>
+<span class="c1">#     &quot;-w&quot;, &quot;--win-encoding&quot;,</span>
+<span class="c1">#     type=str,</span>
+<span class="c1">#     required=False,</span>
+<span class="c1">#     default=&quot;&quot;,</span>
+<span class="c1">#     help=&quot;Use Windows cp1252 encoding for csv file; default utf-8.&quot;,</span>
+<span class="c1"># )</span>
+<span class="c1"># # @click.option(</span>
+<span class="c1"># #     &quot;-k&quot;, &quot;--make_links&quot;,</span>
+<span class="c1"># #     default=False,</span>
+<span class="c1"># #     show_default=True,</span>
+<span class="c1"># #     help=&quot;Create links to underlying files.&quot;</span>
+<span class="c1"># # )</span>
+<span class="c1"># def bibtex(project_root, bib_out, df_out, win_encoding): # , make_links):</span>
+<span class="c1">#     &quot;&quot;&quot;</span>
+<span class="c1">#     Generate a trimmed BibTeX file from the references in a Quarto project.</span>
+
+<span class="c1">#     \b</span>
+<span class="c1">#     - a Quarto project directory (with _quarto.yml / _quarto.yaml),</span>
+<span class="c1">#     - a single .qmd file,</span>
+<span class="c1">#     - a _quarto.yml / _quarto.yaml file.</span>
+<span class="c1">#     &quot;&quot;&quot;</span>
+<span class="c1">#     qb = QuartoBibTex(base_dir=project_root)</span>
+<span class="c1">#     qb.make_df()</span>
+<span class="c1">#     qb.write_bib(bib_out)</span>
+<span class="c1">#     click.echo(f&quot;Wrote trimmed BibTeX to {bib_out} with {len(qb.df)} entries.&quot;)</span>
+
+<span class="c1">#     if df_out:</span>
+<span class="c1">#         num = qb.write_df(df_out)</span>
+<span class="c1">#         click.echo(f&quot;Wrote df to {df_out}.&quot;)</span>
+
+    <span class="c1"># links NYI</span>
+    <span class="c1"># if make_links is not None:</span>
+    <span class="c1">#     links_out = bib_out.parent / &quot;links&quot;</span>
+    <span class="c1">#     links_out.mkdir(exist_ok=True)</span>
+    <span class="c1">#     num = qb.write_links(links_out)</span>
+    <span class="c1">#     click.echo(f&quot;Wrote {num} links to {links_out}.&quot;)</span>
+
+
+<span class="c1"># xref: cross referencing ====================================================</span>
+<span class="nd">@entry</span><span class="o">.</span><span class="n">command</span><span class="p">()</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span>
+    <span class="s2">&quot;input_path&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-w&quot;</span><span class="p">,</span> <span class="s2">&quot;--write-csv&quot;</span><span class="p">,</span>
+    <span class="n">is_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Write defs/refs CSV files alongside the project root.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-o&quot;</span><span class="p">,</span> <span class="s2">&quot;--out-prefix&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;quarto_xrefs&quot;</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Filename prefix for CSV outputs (without extension).&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-f&quot;</span><span class="p">,</span> <span class="s2">&quot;--file&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;explicit_files&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Explicit QMD files to include; may be given multiple times.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-g&quot;</span><span class="p">,</span> <span class="s2">&quot;--pattern&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;file_patterns&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Glob pattern(s) for QMD files relative to INPUT_PATH, like ripgrep -g.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--fail-on-error&quot;</span><span class="p">,</span>
+    <span class="n">is_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Exit with non-zero status if issues are found.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">xrefs</span><span class="p">(</span>
+    <span class="n">input_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">write_csv</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">out_prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">explicit_files</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">file_patterns</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">fail_on_error</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Scan a Quarto project for label definitions and references and report issues.</span>
+
+<span class="sd">    INPUT_PATH may be:</span>
+
+<span class="sd">    \b</span>
+<span class="sd">    - a Quarto project directory (with _quarto.yml / _quarto.yaml),</span>
+<span class="sd">    - a single .qmd file,</span>
+<span class="sd">    - a _quarto.yml / _quarto.yaml file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">base_dir</span><span class="p">,</span> <span class="n">project_yaml</span><span class="p">,</span> <span class="n">patterns</span><span class="p">,</span> <span class="n">explicit_files</span> <span class="o">=</span> <span class="n">resolve_quarto_context</span><span class="p">(</span>
+        <span class="n">input_path</span><span class="o">=</span><span class="n">input_path</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">file_patterns</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">xr</span> <span class="o">=</span> <span class="n">QuartoXRefs</span><span class="p">(</span>
+        <span class="n">base_dir</span><span class="o">=</span><span class="n">base_dir</span><span class="p">,</span>
+        <span class="n">project_yaml</span><span class="o">=</span><span class="n">project_yaml</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">patterns</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">defs_df</span><span class="p">,</span> <span class="n">refs_df</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">scan</span><span class="p">()</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">validate</span><span class="p">()</span>
+
+    <span class="n">dup_df</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;duplicate_labels_df&quot;</span><span class="p">)</span>
+    <span class="n">undef_df</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;undefined_refs_df&quot;</span><span class="p">)</span>
+    <span class="n">unused_df</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;unused_defs_df&quot;</span><span class="p">)</span>
+
+    <span class="n">dup</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dup_df</span><span class="p">)</span> <span class="k">if</span> <span class="n">dup_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="n">undef</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">undef_df</span><span class="p">)</span> <span class="k">if</span> <span class="n">undef_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="n">unused</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">unused_df</span><span class="p">)</span> <span class="k">if</span> <span class="n">unused_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Duplicate labels : </span><span class="si">{</span><span class="n">dup</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Undefined refs   : </span><span class="si">{</span><span class="n">undef</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unused defs      : </span><span class="si">{</span><span class="n">unused</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">write_csv</span><span class="p">:</span>
+        <span class="n">out_prefix_path</span> <span class="o">=</span> <span class="n">base_dir</span> <span class="o">/</span> <span class="n">out_prefix</span>
+        <span class="n">defs_csv</span> <span class="o">=</span> <span class="n">out_prefix_path</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.defs.csv&quot;</span><span class="p">)</span>
+        <span class="n">refs_csv</span> <span class="o">=</span> <span class="n">out_prefix_path</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.refs.csv&quot;</span><span class="p">)</span>
+        <span class="n">defs_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">defs_csv</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">refs_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">refs_csv</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Wrote </span><span class="si">{</span><span class="n">defs_csv</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">refs_csv</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">fail_on_error</span> <span class="ow">and</span> <span class="p">(</span><span class="n">dup</span> <span class="ow">or</span> <span class="n">undef</span> <span class="ow">or</span> <span class="n">unused</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+
+<span class="c1"># @entry.command()</span>
+<span class="c1"># @click.argument(</span>
+<span class="c1">#     &quot;project_root&quot;,</span>
+<span class="c1">#     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),</span>
+<span class="c1"># )</span>
+<span class="c1"># @click.option(</span>
+<span class="c1">#     &quot;-w&quot;, &quot;--write-csv&quot;,</span>
+<span class="c1">#     is_flag=True,</span>
+<span class="c1">#     help=&quot;Write defs/refs CSV files alongside the project root.&quot;,</span>
+<span class="c1"># )</span>
+<span class="c1"># @click.option(</span>
+<span class="c1">#     &quot;-o&quot;,&quot;--out-prefix&quot;,</span>
+<span class="c1">#     type=str,</span>
+<span class="c1">#     default=&quot;quarto_xrefs&quot;,</span>
+<span class="c1">#     show_default=True,</span>
+<span class="c1">#     help=&quot;Filename prefix for CSV outputs (without extension).&quot;,</span>
+<span class="c1"># )</span>
+<span class="c1"># @click.option(</span>
+<span class="c1">#     &quot;-f&quot;,&quot;--fail-on-error&quot;,</span>
+<span class="c1">#     is_flag=True,</span>
+<span class="c1">#     default=False,</span>
+<span class="c1">#     help=&quot;Exit with non-zero status if issues are found.&quot;,</span>
+<span class="c1"># )</span>
+<span class="c1"># def xrefs(project_root, write_csv, out_prefix, fail_on_error):</span>
+<span class="c1">#     &quot;&quot;&quot;</span>
+<span class="c1">#     Scan a Quarto project for label definitions and references and report issues.</span>
+<span class="c1">#     &quot;&quot;&quot;</span>
+<span class="c1">#     xr = QuartoXRefs(base_dir=project_root)</span>
+<span class="c1">#     defs_df, refs_df = xr.scan()</span>
+<span class="c1">#     results = xr.validate()</span>
+
+<span class="c1">#     summary_df = results[&quot;summary_df&quot;]</span>
+
+<span class="c1">#     # output results</span>
+<span class="c1">#     ff = lambda x: f&#39;{int(x):d}&#39;</span>
+<span class="c1">#     # for k, v in results.items():</span>
+<span class="c1">#     for k in [&#39;summary_df&#39;, &#39;duplicate_labels_df&#39;, &#39;undefined_refs_df&#39;]:</span>
+<span class="c1">#         v = results[k]</span>
+<span class="c1">#         try:</span>
+<span class="c1">#             print(k)</span>
+<span class="c1">#             print(&#39;=&#39; * len(k))</span>
+<span class="c1">#             print()</span>
+<span class="c1">#             print(GT(v, large_ok=True, formatters={</span>
+<span class="c1">#                 &#39;def_count&#39;: ff,</span>
+<span class="c1">#                 &#39;ref_count&#39;: ff,</span>
+<span class="c1">#                 &#39;xref&#39;: ff,</span>
+<span class="c1">#                 # actually boolean</span>
+<span class="c1">#                 &quot;allowed&quot;: lambda x: &#39;Yes&#39; if x else &#39;No&#39;</span>
+<span class="c1">#                  },</span>
+<span class="c1">#                  max_table_inch_width=12,</span>
+<span class="c1">#                  show_index=False))</span>
+<span class="c1">#             print()</span>
+<span class="c1">#         except:</span>
+<span class="c1">#             print(f&#39;ISSUE with {k}&#39;)</span>
+<span class="c1">#             print(v)</span>
+
+<span class="c1">#     if write_csv:</span>
+
+<span class="c1">#         # write in calling dir for now</span>
+<span class="c1">#         project_root = Path(&#39;.&#39;)</span>
+
+<span class="c1">#         defs_path = project_root / f&quot;{out_prefix}_defs.csv&quot;</span>
+<span class="c1">#         refs_path = project_root / f&quot;{out_prefix}_refs.csv&quot;</span>
+<span class="c1">#         results[&quot;duplicate_labels_df&quot;].to_csv(</span>
+<span class="c1">#             project_root / f&quot;{out_prefix}_duplicate_labels.csv&quot;,</span>
+<span class="c1">#             index=False,</span>
+<span class="c1">#         )</span>
+<span class="c1">#         results[&quot;undefined_refs_df&quot;].to_csv(</span>
+<span class="c1">#             project_root / f&quot;{out_prefix}_undefined_refs.csv&quot;,</span>
+<span class="c1">#             index=False,</span>
+<span class="c1">#         )</span>
+<span class="c1">#         results[&quot;unused_defs_df&quot;].to_csv(</span>
+<span class="c1">#             project_root / f&quot;{out_prefix}_unused_defs.csv&quot;,</span>
+<span class="c1">#             index=False,</span>
+<span class="c1">#         )</span>
+<span class="c1">#         defs_df.to_csv(defs_path, index=False)</span>
+<span class="c1">#         refs_df.to_csv(refs_path, index=False)</span>
+<span class="c1">#         click.echo(f&quot;Wrote defs to {defs_path}&quot;)</span>
+<span class="c1">#         click.echo(f&quot;Wrote refs to {refs_path}&quot;)</span>
+
+<span class="c1">#     if fail_on_error and not results[&quot;ok&quot;]:</span>
+<span class="c1">#         raise SystemExit(1)</span>
+
+
+<span class="c1"># tidying ====================================================</span>
+<span class="nd">@entry</span><span class="o">.</span><span class="n">group</span><span class="p">()</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">tidy</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Tidy and report on Quarto .qmd files.&quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+
+
+<span class="nd">@tidy</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;one-file&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span>
+    <span class="s2">&quot;input_file&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span>
+    <span class="s2">&quot;output_file&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">dir_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--recursive/--no-recursive&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Recursively expand nested {{&lt; include &gt;}} directives.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--keep-include-markers/--no-keep-include-markers&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Wrap inlined sections in HTML comments indicating include boundaries.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">tidy_flatten_file</span><span class="p">(</span>
+    <span class="n">input_file</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">output_file</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">recursive</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">keep_include_markers</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Flatten a single QMD file by expanding {{&lt; include &gt;}} directives.</span>
+
+<span class="sd">    INPUT_FILE is the root .qmd file; OUTPUT_FILE is the flattened result.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">qt</span> <span class="o">=</span> <span class="n">QuartoTidy</span><span class="p">(</span><span class="n">base_dir</span><span class="o">=</span><span class="n">input_file</span><span class="o">.</span><span class="n">parent</span><span class="p">)</span>
+
+    <span class="n">qt</span><span class="o">.</span><span class="n">flatten_file</span><span class="p">(</span>
+        <span class="n">main_file</span><span class="o">=</span><span class="n">input_file</span><span class="p">,</span>
+        <span class="n">output_path</span><span class="o">=</span><span class="n">output_file</span><span class="p">,</span>
+        <span class="n">recursive</span><span class="o">=</span><span class="n">recursive</span><span class="p">,</span>
+        <span class="n">keep_include_markers</span><span class="o">=</span><span class="n">keep_include_markers</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Wrote flattened file to </span><span class="si">{</span><span class="n">output_file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+
+<span class="nd">@tidy</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;format&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span>
+    <span class="s2">&quot;input_path&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-f&quot;</span><span class="p">,</span> <span class="s2">&quot;--file&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;explicit_files&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Explicit QMD files to include; may be given multiple times.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-g&quot;</span><span class="p">,</span> <span class="s2">&quot;--pattern&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;file_patterns&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+        <span class="s2">&quot;Glob pattern(s) for QMD files relative to INPUT_PATH if it is a directory, &quot;</span>
+        <span class="s2">&quot;like ripgrep -g; may be given multiple times.&quot;</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--in-place/--no-in-place&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Modify files in-place or write tidied copies under OUTPUT_DIR.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-o&quot;</span><span class="p">,</span> <span class="s2">&quot;--output-dir&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">dir_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Output directory when not editing in-place.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--remove-comments/--keep-comments&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Remove HTML &lt;!-- ... --&gt; comments outside code fences.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-w&quot;</span><span class="p">,</span> <span class="s2">&quot;--wrap-width&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;If set, wrap prose paragraphs to this column width.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">tidy_format</span><span class="p">(</span>
+    <span class="n">input_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">explicit_files</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">file_patterns</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">in_place</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">remove_comments</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">wrap_width</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Normalize formatting for .qmd files under INPUT_PATH.</span>
+
+<span class="sd">    INPUT_PATH may be:</span>
+
+<span class="sd">    \b</span>
+<span class="sd">    - a Quarto project directory (with _quarto.yml / _quarto.yaml),</span>
+<span class="sd">    - a single .qmd file,</span>
+<span class="sd">    - a _quarto.yml / _quarto.yaml file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">in_place</span> <span class="ow">and</span> <span class="n">output_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">click</span><span class="o">.</span><span class="n">UsageError</span><span class="p">(</span>
+            <span class="s2">&quot;OUTPUT_DIR must be provided when using --no-in-place.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Decide how to interpret INPUT_PATH (mirror the toc command behavior).</span>
+    <span class="n">base_dir</span><span class="p">,</span> <span class="n">project_yaml</span><span class="p">,</span> <span class="n">patterns</span><span class="p">,</span> <span class="n">explicit_files</span> <span class="o">=</span> <span class="n">resolve_quarto_context</span><span class="p">(</span>
+        <span class="n">input_path</span><span class="o">=</span><span class="n">input_path</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">file_patterns</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># if input_path.is_dir():</span>
+    <span class="c1">#     base_dir = input_path</span>
+    <span class="c1">#     project_yaml: Path | None = None</span>
+    <span class="c1">#     patterns = file_patterns</span>
+    <span class="c1"># else:</span>
+    <span class="c1">#     suffix = input_path.suffix.lower()</span>
+    <span class="c1">#     if suffix == &quot;.qmd&quot;:</span>
+    <span class="c1">#         base_dir = input_path.parent</span>
+    <span class="c1">#         project_yaml = None</span>
+    <span class="c1">#         patterns = ()</span>
+    <span class="c1">#         # if no -f/--file given, treat INPUT_PATH as the single explicit file</span>
+    <span class="c1">#         if not explicit_files:</span>
+    <span class="c1">#             explicit_files = (input_path,)</span>
+    <span class="c1">#     else:</span>
+    <span class="c1">#         # treat as explicit project YAML (_quarto.yml / _quarto.yaml)</span>
+    <span class="c1">#         base_dir = input_path.parent</span>
+    <span class="c1">#         project_yaml = input_path</span>
+    <span class="c1">#         patterns = file_patterns</span>
+
+    <span class="n">qt</span> <span class="o">=</span> <span class="n">QuartoTidy</span><span class="p">(</span>
+        <span class="n">base_dir</span><span class="o">=</span><span class="n">base_dir</span><span class="p">,</span>
+        <span class="n">project_yaml</span><span class="o">=</span><span class="n">project_yaml</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">patterns</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">qt</span><span class="o">.</span><span class="n">tidy</span><span class="p">(</span>
+        <span class="n">in_place</span><span class="o">=</span><span class="n">in_place</span><span class="p">,</span>
+        <span class="n">output_dir</span><span class="o">=</span><span class="n">output_dir</span><span class="p">,</span>
+        <span class="n">remove_comments</span><span class="o">=</span><span class="n">remove_comments</span><span class="p">,</span>
+        <span class="n">wrap_width</span><span class="o">=</span><span class="n">wrap_width</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">total_files</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="n">changed</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;changed&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">df</span><span class="o">.</span><span class="n">empty</span> <span class="k">else</span> <span class="mi">0</span>
+
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Tidied </span><span class="si">{</span><span class="n">total_files</span><span class="si">}</span><span class="s2"> file(s); changed </span><span class="si">{</span><span class="n">changed</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">in_place</span> <span class="ow">and</span> <span class="n">output_dir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Wrote tidied files under </span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+
+<span class="nd">@tidy</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;report&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span>
+    <span class="s2">&quot;input_path&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-f&quot;</span><span class="p">,</span> <span class="s2">&quot;--file&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;explicit_files&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Explicit QMD files to include; may be given multiple times.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-g&quot;</span><span class="p">,</span> <span class="s2">&quot;--pattern&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;file_patterns&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+        <span class="s2">&quot;Glob pattern(s) for QMD files relative to INPUT_PATH if it is a directory, &quot;</span>
+        <span class="s2">&quot;like ripgrep -g; may be given multiple times.&quot;</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--xrefs/--no-xrefs&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Include cross-reference checks.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--bibtex/--no-bibtex&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Include citation / BibTeX checks.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--python/--no-python&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;python_blocks&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Include Python-code-block inventory.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-v&quot;</span><span class="p">,</span> <span class="s2">&quot;--verbose/--no-verbose&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;More verbose output.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">tidy_report</span><span class="p">(</span>
+    <span class="n">input_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">explicit_files</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">file_patterns</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">xrefs</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">bibtex</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">python_blocks</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Report on labels, citations, and Python blocks for a Quarto project.</span>
+
+<span class="sd">    INPUT_PATH may be:</span>
+
+<span class="sd">    \b</span>
+<span class="sd">    - a Quarto project directory (with _quarto.yml / _quarto.yaml),</span>
+<span class="sd">    - a single .qmd file,</span>
+<span class="sd">    - a _quarto.yml / _quarto.yaml file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Same INPUT_PATH interpretation as for toc/format.</span>
+    <span class="n">base_dir</span><span class="p">,</span> <span class="n">project_yaml</span><span class="p">,</span> <span class="n">patterns</span><span class="p">,</span> <span class="n">explicit_files</span> <span class="o">=</span> <span class="n">resolve_quarto_context</span><span class="p">(</span>
+        <span class="n">input_path</span><span class="o">=</span><span class="n">input_path</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">file_patterns</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="c1"># if input_path.is_dir():</span>
+    <span class="c1">#     base_dir = input_path</span>
+    <span class="c1">#     project_yaml: Path | None = None</span>
+    <span class="c1">#     patterns = file_patterns</span>
+    <span class="c1"># else:</span>
+    <span class="c1">#     suffix = input_path.suffix.lower()</span>
+    <span class="c1">#     if suffix == &quot;.qmd&quot;:</span>
+    <span class="c1">#         base_dir = input_path.parent</span>
+    <span class="c1">#         project_yaml = None</span>
+    <span class="c1">#         patterns = ()</span>
+    <span class="c1">#         if not explicit_files:</span>
+    <span class="c1">#             explicit_files = (input_path,)</span>
+    <span class="c1">#     else:</span>
+    <span class="c1">#         base_dir = input_path.parent</span>
+    <span class="c1">#         project_yaml = input_path</span>
+    <span class="c1">#         patterns = file_patterns</span>
+
+    <span class="n">qt</span> <span class="o">=</span> <span class="n">QuartoTidy</span><span class="p">(</span>
+        <span class="n">base_dir</span><span class="o">=</span><span class="n">base_dir</span><span class="p">,</span>
+        <span class="n">project_yaml</span><span class="o">=</span><span class="n">project_yaml</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">patterns</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">results</span> <span class="o">=</span> <span class="n">qt</span><span class="o">.</span><span class="n">report</span><span class="p">(</span>
+        <span class="n">include_xrefs</span><span class="o">=</span><span class="n">xrefs</span><span class="p">,</span>
+        <span class="n">include_bibtex</span><span class="o">=</span><span class="n">bibtex</span><span class="p">,</span>
+        <span class="n">include_python</span><span class="o">=</span><span class="n">python_blocks</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">xrefs</span> <span class="ow">and</span> <span class="s2">&quot;xrefs&quot;</span> <span class="ow">in</span> <span class="n">results</span><span class="p">:</span>
+        <span class="n">xr</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;xrefs&quot;</span><span class="p">]</span>
+        <span class="n">dup_df</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;duplicate_labels_df&quot;</span><span class="p">)</span>
+        <span class="n">undef_df</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;undefined_refs_df&quot;</span><span class="p">)</span>
+        <span class="n">unused_df</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;unused_defs_df&quot;</span><span class="p">)</span>
+
+        <span class="n">dup</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dup_df</span><span class="p">)</span> <span class="k">if</span> <span class="n">dup_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="n">undef</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">undef_df</span><span class="p">)</span> <span class="k">if</span> <span class="n">undef_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="n">unused</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">unused_df</span><span class="p">)</span> <span class="k">if</span> <span class="n">unused_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;XREFS:&quot;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  duplicate labels : </span><span class="si">{</span><span class="n">dup</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  undefined refs   : </span><span class="si">{</span><span class="n">undef</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  unused defs      : </span><span class="si">{</span><span class="n">unused</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">dup</span><span class="p">:</span>
+                <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;DUPLICATE DETAILS&quot;</span><span class="p">)</span>
+                <span class="n">qd</span><span class="p">(</span><span class="n">dup_df</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">undef</span><span class="p">:</span>
+                <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;UNDEFINED  REF DETAILS&quot;</span><span class="p">)</span>
+                <span class="n">qd</span><span class="p">(</span><span class="n">undef_df</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">bibtex</span> <span class="ow">and</span> <span class="s2">&quot;bibtex&quot;</span> <span class="ow">in</span> <span class="n">results</span><span class="p">:</span>
+        <span class="n">br</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;bibtex&quot;</span><span class="p">]</span>
+        <span class="n">citation_keys</span> <span class="o">=</span> <span class="n">br</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;citation_keys&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="n">bib_df</span> <span class="o">=</span> <span class="n">br</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bib_df&quot;</span><span class="p">)</span>
+        <span class="n">missing_df</span> <span class="o">=</span> <span class="n">br</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;missing_citations_df&quot;</span><span class="p">)</span>
+        <span class="n">unused_df</span> <span class="o">=</span> <span class="n">br</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;unused_bib_entries_df&quot;</span><span class="p">)</span>
+        <span class="n">bib_paths</span> <span class="o">=</span> <span class="n">br</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bib_paths&quot;</span><span class="p">)</span>
+
+        <span class="n">num_cites</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">citation_keys</span><span class="p">)</span>
+        <span class="n">num_bib</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">bib_df</span><span class="p">)</span> <span class="k">if</span> <span class="n">bib_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="n">num_missing</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">missing_df</span><span class="p">)</span> <span class="k">if</span> <span class="n">missing_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="n">num_unused</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">unused_df</span><span class="p">)</span> <span class="k">if</span> <span class="n">unused_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;BIBTEX:&quot;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  citations found  : </span><span class="si">{</span><span class="n">num_cites</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  bib entries      : </span><span class="si">{</span><span class="n">num_bib</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  missing entries  : </span><span class="si">{</span><span class="n">num_missing</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  unused entries   : </span><span class="si">{</span><span class="n">num_unused</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">dup</span><span class="p">:</span>
+                <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;BIBTEX FILES&quot;</span><span class="p">)</span>
+                <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="n">bib_paths</span><span class="p">)</span>
+                <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;MISSING CITATIONS&quot;</span><span class="p">)</span>
+                <span class="n">qd</span><span class="p">(</span><span class="n">missing_df</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">python_blocks</span> <span class="ow">and</span> <span class="s2">&quot;python&quot;</span> <span class="ow">in</span> <span class="n">results</span><span class="p">:</span>
+        <span class="n">pr</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="s2">&quot;python&quot;</span><span class="p">]</span>
+        <span class="n">blocks_df</span> <span class="o">=</span> <span class="n">pr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;blocks_df&quot;</span><span class="p">)</span>
+        <span class="n">summary_df</span> <span class="o">=</span> <span class="n">pr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;summary_df&quot;</span><span class="p">)</span>
+
+        <span class="n">num_blocks</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">blocks_df</span><span class="p">)</span> <span class="k">if</span> <span class="n">blocks_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="n">num_files</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">summary_df</span><span class="p">)</span> <span class="k">if</span> <span class="n">summary_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;PYTHON BLOCKS:&quot;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  files with blocks: </span><span class="si">{</span><span class="n">num_files</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  total blocks     : </span><span class="si">{</span><span class="n">num_blocks</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+
+<span class="c1"># consolidate: single-file book ================================================</span>
+<span class="nd">@entry</span><span class="o">.</span><span class="n">command</span><span class="p">()</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span>
+    <span class="s2">&quot;input_path&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span>
+    <span class="s2">&quot;output_file&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">dir_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--comment-front-matter/--strip-front-matter&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Preserve per-file YAML front matter as commented blocks.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--heading-level&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Heading level for chapter titles extracted from front matter.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">consolidate</span><span class="p">(</span>
+    <span class="n">input_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">output_file</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">comment_front_matter</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">heading_level</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Consolidate a Quarto project into a single .qmd file.</span>
+
+<span class="sd">    INPUT_PATH may be:</span>
+
+<span class="sd">    \\b</span>
+<span class="sd">    - a Quarto project directory (with _quarto.yml / _quarto.yaml),</span>
+<span class="sd">    - a single .qmd file,</span>
+<span class="sd">    - a _quarto.yml / _quarto.yaml file.</span>
+
+<span class="sd">    The output is a monolithic .qmd that flattens {{&lt; include &gt;}} directives</span>
+<span class="sd">    and inserts chapter headings from per-file &#39;title:&#39; front matter.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">base_dir</span><span class="p">,</span> <span class="n">project_yaml</span><span class="p">,</span> <span class="n">patterns</span><span class="p">,</span> <span class="n">explicit_files</span> <span class="o">=</span> <span class="n">resolve_quarto_context</span><span class="p">(</span>
+        <span class="n">input_path</span><span class="o">=</span><span class="n">input_path</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="p">(),</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="p">(),</span>
+    <span class="p">)</span>
+
+    <span class="n">qc</span> <span class="o">=</span> <span class="n">QuartoConsolidate</span><span class="p">(</span>
+        <span class="n">base_dir</span><span class="o">=</span><span class="n">base_dir</span><span class="p">,</span>
+        <span class="n">project_yaml</span><span class="o">=</span><span class="n">project_yaml</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">patterns</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">qc</span><span class="o">.</span><span class="n">consolidate</span><span class="p">(</span>
+        <span class="n">output_path</span><span class="o">=</span><span class="n">output_file</span><span class="p">,</span>
+        <span class="n">comment_front_matter</span><span class="o">=</span><span class="n">comment_front_matter</span><span class="p">,</span>
+        <span class="n">heading_level</span><span class="o">=</span><span class="n">heading_level</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Wrote consolidated file to </span><span class="si">{</span><span class="n">output_file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+
+<span class="c1"># pytesting ====================================================</span>
+<span class="nd">@entry</span><span class="o">.</span><span class="n">group</span><span class="p">()</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">qpytest</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Python block extraction and testing for Quarto .qmd files.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+
+
+<span class="nd">@qpytest</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;collect&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span>
+    <span class="s2">&quot;input_path&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-f&quot;</span><span class="p">,</span> <span class="s2">&quot;--file&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;explicit_files&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Explicit QMD files to include; may be given multiple times.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-g&quot;</span><span class="p">,</span> <span class="s2">&quot;--pattern&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;file_patterns&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Glob pattern(s) for QMD files relative to INPUT_PATH, like ripgrep -g.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">qpytest_collect</span><span class="p">(</span>
+    <span class="n">input_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">explicit_files</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">file_patterns</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    List all Python code blocks found in Quarto .qmd files under INPUT_PATH.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">base_dir</span><span class="p">,</span> <span class="n">project_yaml</span><span class="p">,</span> <span class="n">patterns</span><span class="p">,</span> <span class="n">explicit_files</span> <span class="o">=</span> <span class="n">resolve_quarto_context</span><span class="p">(</span>
+        <span class="n">input_path</span><span class="o">=</span><span class="n">input_path</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">file_patterns</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">qpt</span> <span class="o">=</span> <span class="n">QuartoPyTest</span><span class="p">(</span>
+        <span class="n">base_dir</span><span class="o">=</span><span class="n">base_dir</span><span class="p">,</span>
+        <span class="n">project_yaml</span><span class="o">=</span><span class="n">project_yaml</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">patterns</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">qpt</span><span class="o">.</span><span class="n">collect_blocks</span><span class="p">()</span>
+
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="si">}</span><span class="s2"> python block(s).&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">df</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="n">by_file</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;file&quot;</span><span class="p">)[</span><span class="s2">&quot;block_index&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">count</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;Blocks per file:&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">by_file</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;file&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> : </span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;block_index&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># qd(df.head(10))</span>
+
+<span class="nd">@qpytest</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;extract&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span>
+    <span class="s2">&quot;input_path&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span>
+    <span class="s2">&quot;output_dir&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">file_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-f&quot;</span><span class="p">,</span> <span class="s2">&quot;--file&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;explicit_files&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Explicit QMD files to include; may be given multiple times.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-g&quot;</span><span class="p">,</span> <span class="s2">&quot;--pattern&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;file_patterns&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Glob pattern(s) for QMD files relative to INPUT_PATH, like ripgrep -g.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">qpytest_extract</span><span class="p">(</span>
+    <span class="n">input_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">explicit_files</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">file_patterns</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Extract Python blocks to .py files under OUTPUT_DIR, one per .qmd file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">base_dir</span><span class="p">,</span> <span class="n">project_yaml</span><span class="p">,</span> <span class="n">patterns</span><span class="p">,</span> <span class="n">explicit_files</span> <span class="o">=</span> <span class="n">resolve_quarto_context</span><span class="p">(</span>
+        <span class="n">input_path</span><span class="o">=</span><span class="n">input_path</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">file_patterns</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">qpt</span> <span class="o">=</span> <span class="n">QuartoPyTest</span><span class="p">(</span>
+        <span class="n">base_dir</span><span class="o">=</span><span class="n">base_dir</span><span class="p">,</span>
+        <span class="n">project_yaml</span><span class="o">=</span><span class="n">project_yaml</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">patterns</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">qpt</span><span class="o">.</span><span class="n">extract</span><span class="p">(</span><span class="n">output_dir</span><span class="o">=</span><span class="n">output_dir</span><span class="p">)</span>
+    <span class="n">total_files</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="n">total_blocks</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;blocks&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">df</span><span class="o">.</span><span class="n">empty</span> <span class="k">else</span> <span class="mi">0</span>
+
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Extracted </span><span class="si">{</span><span class="n">total_blocks</span><span class="si">}</span><span class="s2"> block(s) from </span><span class="si">{</span><span class="n">total_files</span><span class="si">}</span><span class="s2"> file(s).&quot;</span><span class="p">)</span>
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Scripts written under </span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+
+<span class="nd">@qpytest</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;run&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span>
+    <span class="s2">&quot;input_path&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-m&quot;</span><span class="p">,</span> <span class="s2">&quot;--mode&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Choice</span><span class="p">([</span><span class="s2">&quot;syntax&quot;</span><span class="p">,</span> <span class="s2">&quot;exec&quot;</span><span class="p">],</span> <span class="n">case_sensitive</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;syntax&quot;</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Test mode: &#39;syntax&#39; compiles only; &#39;exec&#39; executes blocks in-process.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-f&quot;</span><span class="p">,</span> <span class="s2">&quot;--file&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;explicit_files&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Explicit QMD files to include; may be given multiple times.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-g&quot;</span><span class="p">,</span> <span class="s2">&quot;--pattern&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;file_patterns&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Glob pattern(s) for QMD files relative to INPUT_PATH, like ripgrep -g.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">qpytest_run</span><span class="p">(</span>
+    <span class="n">input_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">explicit_files</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">file_patterns</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Test Python blocks in .qmd files under INPUT_PATH (single process).</span>
+
+
+<span class="sd">    SEE PMIR.syntax_check --&gt; that&#39;s how I want the output...</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">base_dir</span><span class="p">,</span> <span class="n">project_yaml</span><span class="p">,</span> <span class="n">patterns</span><span class="p">,</span> <span class="n">explicit_files</span> <span class="o">=</span> <span class="n">resolve_quarto_context</span><span class="p">(</span>
+        <span class="n">input_path</span><span class="o">=</span><span class="n">input_path</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">file_patterns</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">qpt</span> <span class="o">=</span> <span class="n">QuartoPyTest</span><span class="p">(</span>
+        <span class="n">base_dir</span><span class="o">=</span><span class="n">base_dir</span><span class="p">,</span>
+        <span class="n">project_yaml</span><span class="o">=</span><span class="n">project_yaml</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">patterns</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">qpt</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">)</span>
+
+    <span class="n">total</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">total</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;No python blocks found.&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">ok</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;ok&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+    <span class="n">failed</span> <span class="o">=</span> <span class="n">total</span> <span class="o">-</span> <span class="n">ok</span>
+
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mode: </span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Blocks tested : </span><span class="si">{</span><span class="n">total</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Blocks failed : </span><span class="si">{</span><span class="n">failed</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">failed</span><span class="p">:</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;Failures:&quot;</span><span class="p">)</span>
+        <span class="n">failures</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="o">~</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;ok&quot;</span><span class="p">],</span> <span class="p">[</span><span class="s2">&quot;file&quot;</span><span class="p">,</span> <span class="s2">&quot;block_index&quot;</span><span class="p">,</span> <span class="s2">&quot;label&quot;</span><span class="p">,</span> <span class="s2">&quot;error_type&quot;</span><span class="p">]]</span>
+        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">failures</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;label&quot;</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span>
+            <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;file&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> [block </span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;block_index&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">] &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;error_type&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+
+<span class="nd">@qpytest</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;run-parallel&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span>
+    <span class="s2">&quot;input_path&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-o&quot;</span><span class="p">,</span> <span class="s2">&quot;--output-dir&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">file_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+    <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Directory for extracted scripts; defaults to base_dir/.qpytest.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-n&quot;</span><span class="p">,</span> <span class="s2">&quot;--n-workers&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Number of concurrent workers.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-f&quot;</span><span class="p">,</span> <span class="s2">&quot;--file&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;explicit_files&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">file_okay</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Explicit QMD files to include; may be given multiple times.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-g&quot;</span><span class="p">,</span> <span class="s2">&quot;--pattern&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;file_patterns&quot;</span><span class="p">,</span>
+    <span class="n">multiple</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Glob pattern(s) for QMD files relative to INPUT_PATH, like ripgrep -g.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">qpytest_run_parallel</span><span class="p">(</span>
+    <span class="n">input_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">output_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">n_workers</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">explicit_files</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">file_patterns</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Execute chapters in parallel as independent scripts (per .qmd file).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">base_dir</span><span class="p">,</span> <span class="n">project_yaml</span><span class="p">,</span> <span class="n">patterns</span><span class="p">,</span> <span class="n">explicit_files</span> <span class="o">=</span> <span class="n">resolve_quarto_context</span><span class="p">(</span>
+        <span class="n">input_path</span><span class="o">=</span><span class="n">input_path</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">file_patterns</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">qpt</span> <span class="o">=</span> <span class="n">QuartoPyTest</span><span class="p">(</span>
+        <span class="n">base_dir</span><span class="o">=</span><span class="n">base_dir</span><span class="p">,</span>
+        <span class="n">project_yaml</span><span class="o">=</span><span class="n">project_yaml</span><span class="p">,</span>
+        <span class="n">file_patterns</span><span class="o">=</span><span class="n">patterns</span><span class="p">,</span>
+        <span class="n">explicit_files</span><span class="o">=</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">qpt</span><span class="o">.</span><span class="n">run_parallel</span><span class="p">(</span><span class="n">output_dir</span><span class="o">=</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">n_workers</span><span class="o">=</span><span class="n">n_workers</span><span class="p">)</span>
+
+    <span class="n">total</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">total</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;No python blocks found.&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">ok</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;ok&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+    <span class="n">failed</span> <span class="o">=</span> <span class="n">total</span> <span class="o">-</span> <span class="n">ok</span>
+
+    <span class="n">chapters</span> <span class="o">=</span> <span class="n">df</span><span class="p">[[</span><span class="s2">&quot;file&quot;</span><span class="p">,</span> <span class="s2">&quot;ok&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;file&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">agg</span><span class="p">(</span><span class="n">all_ok</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;ok&quot;</span><span class="p">,</span> <span class="s2">&quot;all&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    <span class="n">chapter_failed</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="o">~</span><span class="n">chapters</span><span class="p">[</span><span class="s2">&quot;all_ok&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;Mode: exec-parallel&quot;</span><span class="p">)</span>
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Blocks tested      : </span><span class="si">{</span><span class="n">total</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Blocks with errors : </span><span class="si">{</span><span class="n">failed</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Chapters with errors: </span><span class="si">{</span><span class="n">chapter_failed</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">failed</span><span class="p">:</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;First few failing blocks:&quot;</span><span class="p">)</span>
+        <span class="n">failures</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="o">~</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;ok&quot;</span><span class="p">],</span> <span class="p">[</span><span class="s2">&quot;file&quot;</span><span class="p">,</span> <span class="s2">&quot;block_index&quot;</span><span class="p">,</span> <span class="s2">&quot;label&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">failures</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;label&quot;</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span>
+            <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;file&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> [block </span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;block_index&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+
+<span class="c1"># uber  ====================================================</span>
+<span class="nd">@entry</span><span class="o">.</span><span class="n">command</span><span class="p">()</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">pass_context</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s2">&quot;start&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-p&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;--prompt-label&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;qt uber&quot;</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Label shown in the uber prompt.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-d&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;--debug&quot;</span><span class="p">,</span>
+    <span class="n">is_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Print parsed commands before executing them.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">uber</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">click</span><span class="o">.</span><span class="n">Context</span><span class="p">,</span> <span class="n">start</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">prompt_label</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Interactive shell for quarto_tools.</span>
+
+<span class="sd">    Loads the library once, then lets you run qt subcommands repeatedly with</span>
+<span class="sd">    completion and history. Type &#39;q&#39; or &#39;exit&#39; to leave.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Build command list from registered subcommands plus a few shell helpers.</span>
+    <span class="n">qt_commands</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">commands</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+    <span class="n">special</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;cd&quot;</span><span class="p">,</span> <span class="s2">&quot;pwd&quot;</span><span class="p">,</span> <span class="s2">&quot;dir&quot;</span><span class="p">,</span> <span class="s2">&quot;cls&quot;</span><span class="p">,</span> <span class="s2">&quot;q&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;quit&quot;</span><span class="p">,</span> <span class="s2">&quot;exit&quot;</span><span class="p">,</span> <span class="s2">&quot;help&quot;</span><span class="p">,</span> <span class="s2">&quot;h&quot;</span><span class="p">,</span> <span class="s2">&quot;?&quot;</span><span class="p">]</span>
+
+    <span class="n">dcommands</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">qt_commands</span> <span class="o">+</span> <span class="n">special</span><span class="p">}</span>
+    <span class="c1"># Use a PathCompleter specifically for cd</span>
+    <span class="n">dcommands</span><span class="p">[</span><span class="s2">&quot;cd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">PathCompleter</span><span class="p">(</span><span class="n">only_directories</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">expanduser</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">completer</span> <span class="o">=</span> <span class="n">FuzzyCompleter</span><span class="p">(</span><span class="n">NestedCompleter</span><span class="p">(</span><span class="n">dcommands</span><span class="p">))</span>
+    <span class="n">session</span> <span class="o">=</span> <span class="n">PromptSession</span><span class="p">(</span><span class="n">completer</span><span class="o">=</span><span class="n">completer</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_prompt</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">cwd</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span>
+        <span class="c1"># HTML lets us color the label a bit if you like</span>
+        <span class="k">return</span> <span class="n">HTML</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&lt;ansigreeen&gt;</span><span class="si">{</span><span class="n">cwd</span><span class="si">}</span><span class="s2">&lt;/ansigreeen&gt; &lt;ansired&gt;</span><span class="si">{</span><span class="n">prompt_label</span><span class="si">}</span><span class="s2"> &gt; &lt;/ansired&gt;&quot;</span><span class="p">)</span>
+
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">start</span><span class="p">:</span>
+                <span class="n">q</span> <span class="o">=</span> <span class="n">start</span>
+                <span class="n">start</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">q</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">prompt</span><span class="p">(</span><span class="n">_prompt</span><span class="p">())</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">q</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="k">if</span> <span class="n">q</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;q&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;quit&quot;</span><span class="p">,</span> <span class="s2">&quot;exit&quot;</span><span class="p">,</span> <span class="s2">&quot;..&quot;</span><span class="p">}:</span>
+                <span class="k">break</span>
+            <span class="k">if</span> <span class="n">q</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;h&quot;</span><span class="p">,</span> <span class="s2">&quot;?&quot;</span><span class="p">,</span> <span class="s2">&quot;help&quot;</span><span class="p">}:</span>
+                <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;Type a qt subcommand (e.g. &#39;toc&#39;, &#39;tidy&#39;, &#39;xref&#39;) or &#39;q&#39; to quit.&quot;</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">q</span> <span class="o">==</span> <span class="s2">&quot;cls&quot;</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">system</span><span class="p">(</span><span class="s2">&quot;cls&quot;</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">q</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;pwd&quot;</span><span class="p">,</span> <span class="s2">&quot;cwd&quot;</span><span class="p">}:</span>
+                <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">q</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;cd &quot;</span><span class="p">):</span>
+                <span class="n">path</span> <span class="o">=</span> <span class="n">q</span><span class="p">[</span><span class="mi">3</span><span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">path</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+                    <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+                        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Directory not found: </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">q</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;dir&quot;</span><span class="p">):</span>
+                <span class="c1"># pass dir and its arguments to cmd</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">shell</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="p">:</span>
+                    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">))</span>
+                <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="p">:</span>
+                    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">))</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># Delegate everything else to the main qt entry point</span>
+            <span class="n">_run_qt_line</span><span class="p">(</span><span class="n">ctx</span><span class="o">=</span><span class="n">ctx</span><span class="p">,</span> <span class="n">line</span><span class="o">=</span><span class="n">q</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span> <span class="n">prog_name</span><span class="o">=</span><span class="s2">&quot;qt uber&quot;</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+            <span class="c1"># Ctrl+C: just move to a new prompt</span>
+            <span class="k">continue</span>
+        <span class="k">except</span> <span class="ne">EOFError</span><span class="p">:</span>
+            <span class="c1"># Ctrl+D: exit the shell</span>
+            <span class="k">break</span>
+
+
+<span class="c1"># scripting  ====================================================</span>
+<span class="nd">@entry</span><span class="o">.</span><span class="n">command</span><span class="p">()</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">pass_context</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span>
+    <span class="s2">&quot;script_file&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">exists</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dir_okay</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">path_type</span><span class="o">=</span><span class="n">Path</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;-d&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;--debug&quot;</span><span class="p">,</span>
+    <span class="n">is_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Print parsed commands before executing them.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">script</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">click</span><span class="o">.</span><span class="n">Context</span><span class="p">,</span> <span class="n">script_file</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Run a series of qt commands from SCRIPT_FILE.</span>
+
+<span class="sd">    Lines ending with a backslash &#39;\\&#39; are continued on the next line</span>
+<span class="sd">    (Python-style). Empty lines and lines starting with &#39;#&#39; are ignored.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">text</span> <span class="o">=</span> <span class="n">script_file</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+    <span class="n">lines</span> <span class="o">=</span> <span class="n">text</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
+
+    <span class="n">buffer</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">flush</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">buffer</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">logical</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">buffer</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="n">buffer</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">logical</span><span class="p">:</span>
+            <span class="n">_run_qt_line</span><span class="p">(</span><span class="n">ctx</span><span class="o">=</span><span class="n">ctx</span><span class="p">,</span> <span class="n">line</span><span class="o">=</span><span class="n">logical</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span> <span class="n">prog_name</span><span class="o">=</span><span class="s2">&quot;qt script&quot;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">raw</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span>
+        <span class="n">line</span> <span class="o">=</span> <span class="n">raw</span><span class="o">.</span><span class="n">rstrip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="p">:</span>
+            <span class="c1"># blank line ends any current command</span>
+            <span class="n">flush</span><span class="p">()</span>
+            <span class="k">continue</span>
+
+        <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">&quot;</span><span class="p">):</span>
+            <span class="c1"># continuation: drop trailing backslash and keep accumulating</span>
+            <span class="n">buffer</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">rstrip</span><span class="p">())</span>
+            <span class="k">continue</span>
+
+        <span class="n">buffer</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+        <span class="n">flush</span><span class="p">()</span>
+
+    <span class="c1"># leftover command without trailing newline</span>
+    <span class="n">flush</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Stephen J. Mildenhall.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

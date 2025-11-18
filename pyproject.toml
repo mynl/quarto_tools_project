@@ -23,9 +23,14 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=8",
-  "ruff>=0.5",
+    "pytest>=8",
+    "ruff>=0.5",
+    "sphinx",
+    "myst-parser",
+    "furo",
+    "sphinx_rtd_theme",
 ]
+
 
 [project.urls]
 Homepage = "https://github.com/mynl/quarto_tools_project"

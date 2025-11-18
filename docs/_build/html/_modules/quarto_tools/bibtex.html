@@ -1,0 +1,775 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>quarto_tools.bibtex &mdash; quarto_tools  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            quarto_tools
+              <img src="../../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">quarto_tools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">quarto_tools.bibtex</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for quarto_tools.bibtex</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">BibTeX tools for Quarto projects.</span>
+
+<span class="sd">This module provides:</span>
+
+<span class="sd">- Parsing of BibTeX files into pandas DataFrames using a lightweight parser.</span>
+<span class="sd">- Extraction of cited keys from .qmd files.</span>
+<span class="sd">- Construction of a trimmed .bib file containing only the cited entries.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">discover_quarto_sources</span><span class="p">,</span> <span class="n">extract_front_matter</span><span class="p">,</span>
+                    <span class="n">strip_code_blocks</span><span class="p">,</span>
+                    <span class="n">QUARTO_XREF_PREFIXES</span><span class="p">,</span> <span class="n">QUARTO_XREF_SUFFIXES</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+
+<div class="viewcode-block" id="parse_bibtex_text">
+<a class="viewcode-back" href="../../api.html#quarto_tools.bibtex.parse_bibtex_text">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">parse_bibtex_text</span><span class="p">(</span><span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Parse a BibTeX file into a list of dictionaries.</span>
+
+<span class="sd">    Each dict contains:</span>
+<span class="sd">      - &#39;type&#39; (entry type, e.g. &#39;article&#39;)</span>
+<span class="sd">      - &#39;tag&#39; (the citation key)</span>
+<span class="sd">      - one key per BibTeX field found</span>
+
+<span class="sd">    Assumes all values are of the form:</span>
+
+<span class="sd">        field = { ... },</span>
+
+<span class="sd">    and that entries are separated by leading &#39;@&#39;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">rows</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Split on &#39;@&#39; and reconstruct minimal entries.</span>
+    <span class="n">chunks</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;^@&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">chunks</span><span class="p">:</span>
+        <span class="n">chunk</span> <span class="o">=</span> <span class="n">chunk</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">chunk</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="c1"># Put back the &#39;@&#39; for the parser; header regex allows optional &#39;@&#39;.</span>
+        <span class="n">entry</span> <span class="o">=</span> <span class="s2">&quot;@&quot;</span> <span class="o">+</span> <span class="n">chunk</span>
+        <span class="n">parsed</span> <span class="o">=</span> <span class="n">_parse_entry_fast</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">parsed</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">parsed</span> <span class="o">=</span> <span class="n">_parse_entry_slow</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">parsed</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">parsed</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">pass</span>
+            <span class="c1"># look at this once in a while... </span>
+            <span class="c1"># print(f&#39;PARSE FAILED FOR: {entry}&#39;)</span>
+    <span class="k">return</span> <span class="n">rows</span></div>
+
+
+
+<div class="viewcode-block" id="_parse_entry_fast">
+<a class="viewcode-back" href="../../api.html#quarto_tools.bibtex._parse_entry_fast">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_entry_fast</span><span class="p">(</span><span class="n">entry</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Fast-path parser for well-behaved entries.</span>
+
+<span class="sd">    Uses a single regex to capture fields of the form:</span>
+
+<span class="sd">        key = {value},</span>
+
+<span class="sd">    where &#39;value&#39; may span multiple lines.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">result</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="c1"># Normalize Windows copy-paste line breaks that sometimes include spaces.</span>
+    <span class="n">entry</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\r\n</span><span class="s2">  &quot;</span><span class="p">,</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Step 1: extract type and tag; allow optional leading &#39;@&#39;.</span>
+    <span class="n">header_match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;@?(\w+)\{([^,]+),&quot;</span><span class="p">,</span> <span class="n">entry</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">header_match</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">et</span><span class="p">,</span> <span class="n">tag</span> <span class="o">=</span> <span class="n">header_match</span><span class="o">.</span><span class="n">groups</span><span class="p">()</span>
+    <span class="n">result</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">],</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;tag&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">et</span><span class="p">,</span> <span class="n">tag</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+    <span class="c1"># Step 2: remove header and final trailing &#39;}&#39; if present.</span>
+    <span class="n">body</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="n">header_match</span><span class="o">.</span><span class="n">end</span><span class="p">()</span> <span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">body</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;}&quot;</span><span class="p">):</span>
+        <span class="n">body</span> <span class="o">=</span> <span class="n">body</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">+</span> <span class="s2">&quot;,</span><span class="se">\n</span><span class="s2">&quot;</span>
+
+    <span class="c1"># Step 3: find all &quot;key = {value},\n&quot; patterns with DOTALL enabled.</span>
+    <span class="c1"># allow leading spaces</span>
+    <span class="k">for</span> <span class="n">match</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">finditer</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot; *([a-zA-Z\-]+) *= *{(.*?)},?\n&quot;</span><span class="p">,</span> <span class="n">body</span><span class="p">,</span> <span class="n">flags</span><span class="o">=</span><span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">groups</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">result</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="_parse_entry_slow">
+<a class="viewcode-back" href="../../api.html#quarto_tools.bibtex._parse_entry_slow">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_entry_slow</span><span class="p">(</span><span class="n">entry</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Slow-path parser for entries that defeat the fast regex.</span>
+
+<span class="sd">    This parser:</span>
+<span class="sd">      - finds all occurrences of &#39;key = {&#39; (with flexible spacing),</span>
+<span class="sd">      - slices between successive keys,</span>
+<span class="sd">      - trims trailing &#39;,&#39;</span>
+<span class="sd">      - strips one trailing &#39;}&#39; if present.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">result</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="n">header_match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;@?(\w+)\{([^,]+),&quot;</span><span class="p">,</span> <span class="n">entry</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">header_match</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">result</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">],</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;tag&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">header_match</span><span class="o">.</span><span class="n">groups</span><span class="p">()</span>
+
+    <span class="n">body</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="n">header_match</span><span class="o">.</span><span class="n">end</span><span class="p">()</span> <span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">body</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;}&quot;</span><span class="p">):</span>
+        <span class="n">body</span> <span class="o">=</span> <span class="n">body</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+    <span class="c1"># Find &#39;key = {&#39; allowing arbitrary spaces around &#39;=&#39;.</span>
+    <span class="n">matches</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">finditer</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;([a-zA-Z\-]+)\s*=\s*\{&quot;</span><span class="p">,</span> <span class="n">body</span><span class="p">))</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">matches</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">match</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">matches</span><span class="p">):</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">val_start</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">end</span><span class="p">()</span>
+        <span class="n">val_end</span> <span class="o">=</span> <span class="n">matches</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">()</span> <span class="k">if</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">&lt;</span> <span class="n">n</span> <span class="k">else</span> <span class="nb">len</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+
+        <span class="n">value</span> <span class="o">=</span> <span class="n">body</span><span class="p">[</span><span class="n">val_start</span><span class="p">:</span><span class="n">val_end</span><span class="p">]</span><span class="o">.</span><span class="n">rstrip</span><span class="p">()</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">value</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;}&quot;</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">rstrip</span><span class="p">()</span>
+
+        <span class="n">result</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="QuartoBibTex">
+<a class="viewcode-back" href="../../api.html#quarto_tools.bibtex.QuartoBibTex">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">QuartoBibTex</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Build trimmed BibTeX files for a Quarto project.</span>
+
+<span class="sd">    This class:</span>
+<span class="sd">      - discovers .qmd sources in the same way as QuartoToc,</span>
+<span class="sd">      - collects cited keys from &#39;@citekey&#39; style references,</span>
+<span class="sd">      - discovers BibTeX files from project and per-file YAML,</span>
+<span class="sd">      - parses the BibTeX into a DataFrame,</span>
+<span class="sd">      - filters to cited keys only,</span>
+<span class="sd">      - drops noisy fields and cleans URLs,</span>
+<span class="sd">      - writes a compact .bib file on request.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">base_dir</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">project_yaml</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">file_patterns</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">explicit_files</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;utf-8&quot;</span>
+    <span class="n">ignore_key_prefixes</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">QUARTO_XREF_PREFIXES</span>
+    <span class="n">ignore_key_suffixes</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">QUARTO_XREF_SUFFIXES</span>
+
+    <span class="n">trusted_url_patterns</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">&quot;acm.org&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;ams.org&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;aria.org&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;arxiv.org&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;cambridge.org&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;casact.org&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;doi.org&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;elsevier.com&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;ieee.org&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;ifrs.org&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;jstor.org&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;mdpi.com&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;nature.com&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;nber.org&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;oup.com&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;projecteuclid.org&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;sciencedirect.com&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;siam.org&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;soa.org&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;springer.com&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;springerlink.com&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;ssrn&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;tandfonline.com&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;variancejournal.org&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;wiley.com&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compile a regex that matches cross-ref style keys like</span>
+<span class="sd">        sec-1, fig:foo, exr.3, etc., based on ignore_prefixes.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">pattern</span> <span class="o">=</span> <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^(?:&quot;</span> <span class="o">+</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">ignore_key_prefixes</span> <span class="o">+</span>
+                    <span class="sa">r</span><span class="s2">&quot;)[&quot;</span> <span class="o">+</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">ignore_key_suffixes</span> <span class="o">+</span>
+                    <span class="s2">&quot;]&quot;</span>
+                    <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ignore_prefix_re</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">pattern</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_bib_paths</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">df</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_df</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">make_df</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_df</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">bib_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_bib_paths</span><span class="p">:</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_bib_paths</span><span class="p">)</span><span class="si">}</span><span class="s1"> bibtex files:</span><span class="se">\n\t</span><span class="s1">&#39;</span> <span class="o">+</span>
+                <span class="s1">&#39;</span><span class="se">\n\t</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_bib_paths</span><span class="p">))</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="s1">&#39;No bibtex files found.&#39;</span>
+        <span class="k">return</span> <span class="n">s</span>
+
+<div class="viewcode-block" id="QuartoBibTex._discover_sources">
+<a class="viewcode-back" href="../../api.html#quarto_tools.bibtex.QuartoBibTex._discover_sources">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_discover_sources</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Discover the .qmd source files using the same logic as QuartoToc.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">sources</span><span class="p">,</span> <span class="n">_project_title</span> <span class="o">=</span> <span class="n">discover_quarto_sources</span><span class="p">(</span>
+            <span class="n">base_dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">,</span>
+            <span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">,</span>
+            <span class="n">project_yaml</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project_yaml</span><span class="p">,</span>
+            <span class="n">file_patterns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">file_patterns</span><span class="p">,</span>
+            <span class="n">explicit_files</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">sources</span></div>
+
+
+<div class="viewcode-block" id="QuartoBibTex._project_yaml_path">
+<a class="viewcode-back" href="../../api.html#quarto_tools.bibtex.QuartoBibTex._project_yaml_path">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_project_yaml_path</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the project YAML path, if available.</span>
+
+<span class="sd">        Uses self.project_yaml if provided, else tries _quarto.yml / _quarto.yaml.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">project_yaml</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">project_yaml</span>
+
+        <span class="n">yaml_yml</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span> <span class="o">/</span> <span class="s2">&quot;_quarto.yml&quot;</span>
+        <span class="n">yaml_yaml</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span> <span class="o">/</span> <span class="s2">&quot;_quarto.yaml&quot;</span>
+        <span class="k">if</span> <span class="n">yaml_yml</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">yaml_yml</span>
+        <span class="k">if</span> <span class="n">yaml_yaml</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">yaml_yaml</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="QuartoBibTex._bib_paths_from_project_yaml">
+<a class="viewcode-back" href="../../api.html#quarto_tools.bibtex.QuartoBibTex._bib_paths_from_project_yaml">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_bib_paths_from_project_yaml</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extract bibliography paths from the project-level YAML, if any.</span>
+
+<span class="sd">        Handles only simple patterns:</span>
+
+<span class="sd">          bibliography: refs.bib</span>
+<span class="sd">          bibliography: [a.bib, b.bib]</span>
+
+<span class="sd">        and multi-line lists:</span>
+
+<span class="sd">          bibliography:</span>
+<span class="sd">            - a.bib</span>
+<span class="sd">            - b.bib</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">yaml_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_project_yaml_path</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">yaml_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+
+        <span class="n">text</span> <span class="o">=</span> <span class="n">yaml_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="n">text</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
+
+        <span class="n">bibs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">while</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">):</span>
+            <span class="n">raw</span> <span class="o">=</span> <span class="n">lines</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">raw</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">s</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;bibliography:&quot;</span><span class="p">):</span>
+                <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">continue</span>
+
+            <span class="n">val</span> <span class="o">=</span> <span class="n">s</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;bibliography:&quot;</span><span class="p">)</span> <span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+            <span class="c1"># Inline list: bibliography: [a.bib, b.bib]</span>
+            <span class="k">if</span> <span class="n">val</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;[&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">val</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;]&quot;</span><span class="p">):</span>
+                <span class="n">inner</span> <span class="o">=</span> <span class="n">val</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">piece</span> <span class="ow">in</span> <span class="n">inner</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">):</span>
+                    <span class="n">entry</span> <span class="o">=</span> <span class="n">piece</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\&quot;</span><span class="s2">&#39;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">entry</span><span class="p">:</span>
+                        <span class="n">bibs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+                <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># Single value: bibliography: refs.bib</span>
+            <span class="k">if</span> <span class="n">val</span><span class="p">:</span>
+                <span class="n">entry</span> <span class="o">=</span> <span class="n">val</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\&quot;</span><span class="s2">&#39;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">entry</span><span class="p">:</span>
+                    <span class="n">bibs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+                <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># Multi-line list:</span>
+            <span class="c1"># bibliography:</span>
+            <span class="c1">#   - a.bib</span>
+            <span class="c1">#   - b.bib</span>
+            <span class="n">j</span> <span class="o">=</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="k">while</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">):</span>
+                <span class="n">nxt</span> <span class="o">=</span> <span class="n">lines</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">nxt</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+                    <span class="k">break</span>
+                <span class="n">stripped</span> <span class="o">=</span> <span class="n">nxt</span><span class="o">.</span><span class="n">lstrip</span><span class="p">()</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">stripped</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;- &quot;</span><span class="p">):</span>
+                    <span class="k">break</span>
+                <span class="n">entry</span> <span class="o">=</span> <span class="n">stripped</span><span class="p">[</span><span class="mi">2</span><span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\&quot;</span><span class="s2">&#39;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">entry</span><span class="p">:</span>
+                    <span class="n">bibs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+                <span class="n">j</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="n">j</span>
+
+        <span class="n">paths</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">bibs</span><span class="p">:</span>
+            <span class="c1"># Project-level bibliography paths are relative to base_dir.</span>
+            <span class="n">paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span> <span class="o">/</span> <span class="n">entry</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">paths</span></div>
+
+
+<div class="viewcode-block" id="QuartoBibTex._bib_paths_from_sources">
+<a class="viewcode-back" href="../../api.html#quarto_tools.bibtex.QuartoBibTex._bib_paths_from_sources">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_bib_paths_from_sources</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sources</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Path</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Collect bibliography paths from the YAML front matter of each source.</span>
+
+<span class="sd">        The &#39;bibliography&#39; field in front matter is interpreted as a list</span>
+<span class="sd">        of paths, relative to the source file&#39;s directory.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">paths</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">src</span> <span class="ow">in</span> <span class="n">sources</span><span class="p">:</span>
+            <span class="n">text</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+            <span class="n">_title</span><span class="p">,</span> <span class="n">body_lines</span><span class="p">,</span> <span class="n">meta</span> <span class="o">=</span> <span class="n">extract_front_matter</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+            <span class="n">bib_list</span> <span class="o">=</span> <span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bibliography&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">bib_list</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="k">for</span> <span class="n">rel</span> <span class="ow">in</span> <span class="n">bib_list</span><span class="p">:</span>
+                <span class="n">rel_path</span> <span class="o">=</span> <span class="n">rel</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">rel_path</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">paths</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="n">rel_path</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QuartoBibTex._collect_bib_paths">
+<a class="viewcode-back" href="../../api.html#quarto_tools.bibtex.QuartoBibTex._collect_bib_paths">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_collect_bib_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sources</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Collect all BibTeX paths from project YAML and per-file front matter.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">paths</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_bib_paths_from_project_yaml</span><span class="p">():</span>
+            <span class="n">paths</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_bib_paths_from_sources</span><span class="p">(</span><span class="n">sources</span><span class="p">):</span>
+            <span class="n">paths</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+
+        <span class="c1"># Only keep existing files to avoid surprises.</span>
+        <span class="n">existing</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">paths</span> <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">exists</span><span class="p">()]</span>
+
+        <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">existing</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QuartoBibTex.collect_citations">
+<a class="viewcode-back" href="../../api.html#quarto_tools.bibtex.QuartoBibTex.collect_citations">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">collect_citations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sources</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Scan project sources and return the set of cited BibTeX keys.</span>
+
+<span class="sd">        This looks for &#39;@key&#39; patterns outside code blocks and filters out</span>
+<span class="sd">        keys whose prefixes match ignore_key_prefixes.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">sources</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">sources</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_discover_sources</span><span class="p">()</span>
+
+        <span class="n">keys</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+        <span class="c1"># Regex to find &#39;@key&#39; patterns, avoiding &#39;@@&#39; escapes.</span>
+        <span class="n">cite_rex</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?&lt;!@)@([A-Za-z0-9_:+/-]+)&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">src</span> <span class="ow">in</span> <span class="n">sources</span><span class="p">:</span>
+            <span class="n">text</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+            <span class="n">_title</span><span class="p">,</span> <span class="n">body_lines</span><span class="p">,</span> <span class="n">_meta</span> <span class="o">=</span> <span class="n">extract_front_matter</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+            <span class="n">clean_lines</span> <span class="o">=</span> <span class="n">strip_code_blocks</span><span class="p">(</span><span class="n">body_lines</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">clean_lines</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">cite_rex</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">line</span><span class="p">):</span>
+                    <span class="c1"># Ignore cross-refs like sec-..., fig:..., exr., etc.</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ignore_prefix_re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">key</span><span class="p">):</span>
+                        <span class="k">continue</span>
+                    <span class="n">keys</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">keys</span></div>
+
+
+<div class="viewcode-block" id="QuartoBibTex.make_df">
+<a class="viewcode-back" href="../../api.html#quarto_tools.bibtex.QuartoBibTex.make_df">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">make_df</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Build and return the filtered BibTeX DataFrame for cited keys only.</span>
+
+<span class="sd">        The resulting DataFrame has at least the columns:</span>
+<span class="sd">          - &#39;type&#39;</span>
+<span class="sd">          - &#39;tag&#39;</span>
+<span class="sd">        plus a subset of common BibTeX fields, with noisy fields removed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># qmd source files</span>
+        <span class="n">sources</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_discover_sources</span><span class="p">()</span>
+        <span class="c1"># citation keys within those sources</span>
+        <span class="n">citation_keys</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">collect_citations</span><span class="p">(</span><span class="n">sources</span><span class="p">)</span>
+        <span class="c1"># paths of bibtex files found referenced</span>
+        <span class="n">bib_paths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_collect_bib_paths</span><span class="p">(</span><span class="n">sources</span><span class="p">)</span>
+        <span class="c1"># store</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_bib_paths</span> <span class="o">=</span> <span class="n">bib_paths</span>
+
+        <span class="n">rows</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">bib_paths</span><span class="p">:</span>
+            <span class="n">text</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+            <span class="n">rows</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">parse_bibtex_text</span><span class="p">(</span><span class="n">text</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">rows</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span>
+
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+
+        <span class="c1"># ------------------------------------------------------</span>
+        <span class="c1"># for debugging - the full monty</span>
+        <span class="c1"># df.to_csv(&#39;\\tmp\\bib\\FULL-DEBUG.csv&#39;, encoding=&#39;cp1252&#39;, errors=&#39;ignore&#39;)</span>
+        <span class="c1"># print(f&#39;DEBUG written with {len(df)} entries.&#39;)</span>
+        <span class="c1"># print(f&#39;{len(sources) = }&#39;)</span>
+        <span class="c1"># print(f&#39;{len(citation_keys) = }&#39;)</span>
+        <span class="c1"># print(f&#39;{len(bib_paths) = }&#39;)</span>
+        <span class="c1"># ------------------------------------------------------</span>
+
+        <span class="c1"># Filter to cited keys only.</span>
+        <span class="k">if</span> <span class="s2">&quot;tag&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="n">citation_keys</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;tag&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">citation_keys</span><span class="p">)]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="c1"># ------------------------------------------------------</span>
+        <span class="c1"># more debugging</span>
+        <span class="c1"># print(f&#39;AFTER filtering: {len(df)} entries.&#39;)</span>
+        <span class="c1"># matches = set(df.tag)</span>
+        <span class="c1"># keys = set(citation_keys)</span>
+        <span class="c1"># unm = keys - matches</span>
+        <span class="c1"># print(f&#39;{len(unm)} unmatched\n\t&#39;, end=&#39;&#39;, sep=&#39;&#39;)</span>
+        <span class="c1"># print(&#39;\n\t&#39;.join(sorted(unm)))</span>
+        <span class="c1"># df.to_csv(&#39;\\tmp\\bib\\EXTRACTED-DEBUG.csv&#39;, encoding=&#39;cp1252&#39;, errors=&#39;ignore&#39;)</span>
+        <span class="c1"># ------------------------------------------------------</span>
+
+        <span class="k">if</span> <span class="n">df</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="n">df</span>
+            <span class="k">return</span> <span class="n">df</span>
+
+        <span class="c1"># Drop noisy fields by keeping a curated set of columns.</span>
+        <span class="n">keep_fields</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;tag&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;author&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;title&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;year&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;journal&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;booktitle&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;publisher&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;volume&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;number&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;pages&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;address&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;doi&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;url&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;note&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;file&quot;</span>
+        <span class="p">}</span>
+
+        <span class="n">cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">keep_fields</span><span class="p">]</span>
+
+        <span class="c1"># Ensure &#39;type&#39; and &#39;tag&#39; are present and first.</span>
+        <span class="n">ordered_cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">base</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="s2">&quot;tag&quot;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">base</span> <span class="ow">in</span> <span class="n">cols</span><span class="p">:</span>
+                <span class="n">ordered_cols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">base</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">cols</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">ordered_cols</span><span class="p">:</span>
+                <span class="n">ordered_cols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">ordered_cols</span><span class="p">]</span>
+
+        <span class="c1"># Clean URLs based on trusted patterns.</span>
+        <span class="k">if</span> <span class="s2">&quot;url&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">df</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_filter_url</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_df</span> <span class="o">=</span> <span class="n">df</span>
+        <span class="k">return</span> <span class="n">df</span></div>
+
+
+<div class="viewcode-block" id="QuartoBibTex._filter_url">
+<a class="viewcode-back" href="../../api.html#quarto_tools.bibtex.QuartoBibTex._filter_url">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_filter_url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the URL if it matches a trusted pattern, else None.</span>
+
+<span class="sd">        The DataFrame will store missing URLs as NaN if pandas is allowed</span>
+<span class="sd">        to convert None to its missing value representation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">s</span> <span class="o">=</span> <span class="n">url</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">s</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">for</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">trusted_url_patterns</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="n">s</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">s</span>
+
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="QuartoBibTex.write_df">
+<a class="viewcode-back" href="../../api.html#quarto_tools.bibtex.QuartoBibTex.write_df">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">write_df</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">output_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span> <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Write the df to a csv.</span>
+
+<span class="sd">        Use encoding = &#39;cp1252&#39;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">output_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
+        <span class="n">output_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">encoding</span> <span class="o">==</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
+            <span class="n">encoding</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;tag&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QuartoBibTex.write_bib">
+<a class="viewcode-back" href="../../api.html#quarto_tools.bibtex.QuartoBibTex.write_bib">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">write_bib</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">output_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Write a compact .bib file containing only the cited entries.</span>
+
+<span class="sd">        The entries are written in a stable order:</span>
+<span class="sd">          - sorted by &#39;tag&#39;,</span>
+<span class="sd">          - fields in a fixed order where possible.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># nice to have file but don&#39;t want in the output</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="s2">&quot;file&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">df</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="n">output_path</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="c1"># Sort by tag to keep output stable.</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">&quot;author&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Define preferred field order after type/tag.</span>
+        <span class="n">preferred_order</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;author&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;title&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;year&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;journal&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;booktitle&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;publisher&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;address&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;volume&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;number&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;pages&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;doi&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;url&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;note&quot;</span><span class="p">,</span>
+        <span class="p">]</span>
+
+        <span class="n">lines</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">_idx</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="n">entry_type</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="s2">&quot;misc&quot;</span><span class="p">)</span>
+            <span class="n">tag</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tag&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">tag</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Missing tag for </span><span class="si">{</span><span class="n">row</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># Decide field order for this entry.</span>
+            <span class="n">field_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="s2">&quot;tag&quot;</span><span class="p">}]</span>
+
+            <span class="n">ordered_fields</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">preferred_order</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">field_names</span><span class="p">:</span>
+                    <span class="n">ordered_fields</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">field_names</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">ordered_fields</span><span class="p">:</span>
+                    <span class="n">ordered_fields</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+
+            <span class="c1"># Build entry.</span>
+            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;@</span><span class="si">{</span><span class="n">entry_type</span><span class="si">}</span><span class="se">{{</span><span class="si">{</span><span class="n">tag</span><span class="si">}</span><span class="s2">,&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">ordered_fields</span><span class="p">:</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span> <span class="ow">and</span> <span class="n">pd</span><span class="o">.</span><span class="n">isna</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">value_str</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">value_str</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="c1"># Wrap the raw value in braces; assume it is already BibTeX-safe.</span>
+                <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> = </span><span class="se">{{</span><span class="si">{</span><span class="n">value_str</span><span class="si">}</span><span class="se">}}</span><span class="s2">,&quot;</span><span class="p">)</span>
+            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;}&quot;</span><span class="p">)</span>
+            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>  <span class="c1"># blank line between entries</span>
+
+        <span class="n">output</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span>
+        <span class="n">output_path</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QuartoBibTex.write_links">
+<a class="viewcode-back" href="../../api.html#quarto_tools.bibtex.QuartoBibTex.write_links">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">write_links</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dir_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Write links to all files.&quot;&quot;&quot;</span>
+        <span class="n">links_created</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">files</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;file&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;;&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;ATTR error for </span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;tag&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1">, file = </span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;file&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">len_files</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">files</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">files</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">f</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">files</span><span class="p">):</span>
+                        <span class="n">f</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;:pdf&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;:C&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">)</span>
+                        <span class="n">p</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                            <span class="n">nn</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;tag&#39;</span><span class="p">]</span> <span class="k">if</span> <span class="n">len_files</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s1">-</span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;tag&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1">&#39;</span>
+                            <span class="n">newf</span> <span class="o">=</span> <span class="n">dir_path</span> <span class="o">/</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">nn</span><span class="si">}</span><span class="s1">.pdf&#39;</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">newf</span><span class="si">}</span><span class="s1"> link to </span><span class="si">{</span><span class="n">p</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+                            <span class="n">links_created</span> <span class="o">+=</span> <span class="mi">1</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Link  for </span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;tag&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1"> missing: </span><span class="si">{</span><span class="n">p</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">links_created</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Stephen J. Mildenhall.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

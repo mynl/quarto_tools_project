@@ -1,0 +1,510 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>quarto_tools &mdash; quarto_tools  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+    <link rel="shortcut icon" href="_static/favicon.ico"/>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="API reference" href="api.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="#" class="icon icon-home">
+            quarto_tools
+              <img src="_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">quarto_tools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">quarto_tools</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/index.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul><div class="rst-breadcrumbs-buttons" role="navigation" aria-label="Sequential page navigation">
+        <a href="api.html" class="btn btn-neutral float-right" title="API reference" accesskey="n">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+  </div>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <!-- https://myst-parser.readthedocs.io/en/v0.15.1/sphinx/intro.html -->
+<section id="quarto-tools">
+<h1>quarto_tools<a class="headerlink" href="#quarto-tools" title="Link to this heading"></a></h1>
+<p>Utilities for working with Quarto projects in Python:</p>
+<ul class="simple">
+<li><p>build compact TikZ tables of contents from <code class="docutils literal notranslate"><span class="pre">.qmd</span></code> files,</p></li>
+<li><p>generate trimmed BibTeX files containing only the references used in the project,</p></li>
+<li><p>audit Quarto cross-references (labels and refs) across the project,</p></li>
+<li><p>tidy and normalize <code class="docutils literal notranslate"><span class="pre">.qmd</span></code> files (flatten includes, clean paragraphs, remove comments),</p></li>
+<li><p>extract, syntax-check, and execute Python blocks embedded in <code class="docutils literal notranslate"><span class="pre">.qmd</span></code> files.</p></li>
+<li><p>consolidate a book project into a single file.</p></li>
+</ul>
+<p>The tools share one core philosophy: operate directly on <code class="docutils literal notranslate"><span class="pre">.qmd</span></code>, <code class="docutils literal notranslate"><span class="pre">_quarto.yml</span></code>, and <code class="docutils literal notranslate"><span class="pre">.bib</span></code> files using simple Python logic, without heavy external parsers. Everything is fast and transparent.</p>
+<p>All commands share a unified project-discovery system.
+Each command accepts an <code class="docutils literal notranslate"><span class="pre">INPUT_PATH</span></code> which may be:</p>
+<ul class="simple">
+<li><p>a directory,</p></li>
+<li><p>a single <code class="docutils literal notranslate"><span class="pre">.qmd</span></code>,</p></li>
+<li><p>a <code class="docutils literal notranslate"><span class="pre">_quarto.yml</span></code> or <code class="docutils literal notranslate"><span class="pre">_quarto.yaml</span></code> file,</p></li>
+</ul>
+<p>and may be refined with:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-f</span> <span class="pre">FILE</span></code> one or more explicit <code class="docutils literal notranslate"><span class="pre">.qmd</span></code> files,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-g</span> <span class="pre">PATTERN</span></code> one or more ripgrep-style glob patterns.</p></li>
+</ul>
+<p>Under the hood this is implemented in <code class="docutils literal notranslate"><span class="pre">utils.resolve_quarto_context</span></code>, which ensures all commands behave consistently.</p>
+<hr class="docutils" />
+<section id="features">
+<h2>Features<a class="headerlink" href="#features" title="Link to this heading"></a></h2>
+<section id="project-discovery">
+<h3>Project discovery<a class="headerlink" href="#project-discovery" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Understands Quarto projects via <code class="docutils literal notranslate"><span class="pre">_quarto.yml</span></code> / <code class="docutils literal notranslate"><span class="pre">_quarto.yaml</span></code>.</p></li>
+<li><p>Can operate on a directory of <code class="docutils literal notranslate"><span class="pre">.qmd</span></code> files, a single <code class="docutils literal notranslate"><span class="pre">.qmd</span></code>, or an explicit project YAML file.</p></li>
+<li><p>Supports ripgrep-style file patterns (<code class="docutils literal notranslate"><span class="pre">-g/--pattern</span></code>) and explicit file lists (<code class="docutils literal notranslate"><span class="pre">-f/--file</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">explicit_files</span></code> always override patterns and YAML.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.qmd</span></code> input forces single-file mode unless explicit files are given.</p></li>
+</ul>
+</section>
+<section id="table-of-contents-toc">
+<h3>Table of Contents (TOC)<a class="headerlink" href="#table-of-contents-toc" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Extracts headings from <code class="docutils literal notranslate"><span class="pre">.qmd</span></code> files, ignoring code blocks.</p></li>
+<li><p>Respects Quarto project ordering from YAML.</p></li>
+<li><p>Produces compact TikZ output suitable for LaTeX.</p></li>
+<li><p>Configurable column widths, wrapping logic, level limits, and omit-lists.</p></li>
+<li><p>Debug mode for visualizing layout and diagnostics.</p></li>
+</ul>
+</section>
+<section id="bibtex-trimming">
+<h3>BibTeX trimming<a class="headerlink" href="#bibtex-trimming" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Discovers BibTeX files from project YAML and front matter.</p></li>
+<li><p>Extracts only citation keys actually used in <code class="docutils literal notranslate"><span class="pre">.qmd</span></code> files.</p></li>
+<li><p>Parses BibTeX into a clean pandas DataFrame.</p></li>
+<li><p>Removes noisy or unhelpful fields (e.g., <code class="docutils literal notranslate"><span class="pre">abstract</span></code>, <code class="docutils literal notranslate"><span class="pre">file</span></code>, <code class="docutils literal notranslate"><span class="pre">annote</span></code>).</p></li>
+<li><p>Prefers useful links such as DOIs and publisher URLs.</p></li>
+<li><p>Can write tidy <code class="docutils literal notranslate"><span class="pre">.bib</span></code> files and optional CSVs.</p></li>
+</ul>
+</section>
+<section id="cross-reference-auditing-xrefs">
+<h3>Cross-reference auditing (xrefs)<a class="headerlink" href="#cross-reference-auditing-xrefs" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Scans for Quarto labels (<code class="docutils literal notranslate"><span class="pre">{#fig-...}</span></code>, <code class="docutils literal notranslate"><span class="pre">{#sec-...}</span></code>) and chunk labels (<code class="docutils literal notranslate"><span class="pre">#|</span> <span class="pre">label:</span> <span class="pre">fig-...</span></code>).</p></li>
+<li><p>Scans for Quarto-style cross-references (<code class="docutils literal notranslate"><span class="pre">&#64;fig-...</span></code>, <code class="docutils literal notranslate"><span class="pre">&#64;sec-...</span></code>) while ignoring BibTeX citations.</p></li>
+<li><p>Reports duplicates, undefined references, unused labels, and useful prefix statistics.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--write-csv</span></code> mode dumps all tables for debugging.</p></li>
+</ul>
+</section>
+<section id="tidy">
+<h3>Tidy<a class="headerlink" href="#tidy" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">tidy</span></code> command group provides three functions:</p>
+<p><strong>1. Flatten</strong>
+Inline all <code class="docutils literal notranslate"><span class="pre">{{&lt;</span> <span class="pre">include</span> <span class="pre">&gt;}}</span></code> blocks:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">qt</span> <span class="n">tidy</span> <span class="n">flatten</span><span class="o">-</span><span class="n">file</span> <span class="nb">input</span><span class="o">.</span><span class="n">qmd</span> <span class="n">output</span><span class="o">.</span><span class="n">qmd</span>
+</pre></div>
+</div>
+<p>Options include recursive flattening and include-markers.</p>
+<p><strong>2. Format / normalize</strong>
+Clean and rewrite <code class="docutils literal notranslate"><span class="pre">.qmd</span></code> files:</p>
+<ul class="simple">
+<li><p>normalize paragraph spacing,</p></li>
+<li><p>maintain clean code-block boundaries,</p></li>
+<li><p>remove or keep HTML comments,</p></li>
+<li><p>wrap paragraphs if desired,</p></li>
+<li><p>write output either in-place or to a separate directory.</p></li>
+</ul>
+<p><strong>3. Report</strong>
+Runs:</p>
+<ul class="simple">
+<li><p>cross-reference audit,</p></li>
+<li><p>BibTeX audit,</p></li>
+<li><p>Python-block enumeration,</p></li>
+</ul>
+<p>and prints a unified report for an entire project.</p>
+</section>
+<section id="python-code-block-testing-qpytest">
+<h3>Python code-block testing (qpytest)<a class="headerlink" href="#python-code-block-testing-qpytest" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">qpytest</span></code> group operates on fenced Python blocks discovered via <code class="docutils literal notranslate"><span class="pre">blocks.py</span></code>.</p>
+<p>Capabilities:</p>
+<ul class="simple">
+<li><p><strong>collect</strong> — list python blocks with labels and captions,</p></li>
+<li><p><strong>extract</strong> — generate one <code class="docutils literal notranslate"><span class="pre">.py</span></code> file per <code class="docutils literal notranslate"><span class="pre">.qmd</span></code> capturing all python blocks,</p></li>
+<li><p><strong>run</strong> — syntax-check or execute each block using IPython and matplotlib Agg,</p></li>
+<li><p><strong>run-parallel</strong> — run each chapter in a separate subprocess for major speedups.</p></li>
+</ul>
+<p>Outputs include structured summaries and optional <code class="docutils literal notranslate"><span class="pre">.output</span></code>, <code class="docutils literal notranslate"><span class="pre">.stderr</span></code>, and <code class="docutils literal notranslate"><span class="pre">.error</span></code> files next to each extracted script.</p>
+</section>
+<section id="project-consolidation-consolidate">
+<h3>Project consolidation (consolidate)<a class="headerlink" href="#project-consolidation-consolidate" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Converts an entire Quarto book or project into a single <code class="docutils literal notranslate"><span class="pre">.qmd</span></code> file.</p></li>
+<li><p>Uses the project’s <code class="docutils literal notranslate"><span class="pre">_quarto.yml</span></code> to discover chapter order.</p></li>
+<li><p>Inlines all <code class="docutils literal notranslate"><span class="pre">{{&lt;</span> <span class="pre">include</span> <span class="pre">&gt;}}</span></code> directives recursively, producing a fully expanded document.</p></li>
+<li><p>Strips per-file YAML front matter by default; the <code class="docutils literal notranslate"><span class="pre">--comment-front-matter</span></code> flag preserves it as commented blocks.</p></li>
+<li><p>Converts each file’s <code class="docutils literal notranslate"><span class="pre">title:</span></code> into a chapter heading at the chosen level.</p></li>
+<li><p>Produces a clean, linear document suitable for debugging, diffing, archiving, or standalone rendering.</p></li>
+</ul>
+</section>
+<section id="interactive-shell-uber">
+<h3>Interactive shell (uber)<a class="headerlink" href="#interactive-shell-uber" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">qt</span> <span class="pre">uber</span></code> starts an interactive prompt for running multiple <code class="docutils literal notranslate"><span class="pre">qt</span></code> commands
+without reloading the library each time.</p></li>
+<li><p>Provides fuzzy autocompletion for all subcommands, plus navigation helpers
+(<code class="docutils literal notranslate"><span class="pre">cd</span></code>, <code class="docutils literal notranslate"><span class="pre">pwd</span></code>, <code class="docutils literal notranslate"><span class="pre">dir</span></code>, <code class="docutils literal notranslate"><span class="pre">cls</span></code>, <code class="docutils literal notranslate"><span class="pre">e</span></code>, <code class="docutils literal notranslate"><span class="pre">ex</span></code>, <code class="docutils literal notranslate"><span class="pre">ev</span></code>).</p></li>
+<li><p>Useful for exploratory work, repeated TOC generation, quick tidy / xref cycles,
+or anything where reload time becomes distracting.</p></li>
+<li><p>The first argument may be an initial command to run before dropping
+into the prompt.</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">-p</span></code> to customize the prompt label and <code class="docutils literal notranslate"><span class="pre">-d</span></code> for debug output.</p></li>
+</ul>
+<p>Example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">qt</span> <span class="n">uber</span>
+<span class="c1"># or</span>
+<span class="n">qt</span> <span class="n">uber</span> <span class="o">-</span><span class="n">p</span> <span class="s2">&quot;qt-tools&quot;</span>
+</pre></div>
+</div>
+<p>Exit with <code class="docutils literal notranslate"><span class="pre">q</span></code>, <code class="docutils literal notranslate"><span class="pre">x</span></code>, <code class="docutils literal notranslate"><span class="pre">quit</span></code>, or <code class="docutils literal notranslate"><span class="pre">exit</span></code>.</p>
+</section>
+<section id="scripted-execution-script">
+<h3>Scripted execution (script)<a class="headerlink" href="#scripted-execution-script" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">qt</span> <span class="pre">script</span> <span class="pre">my-commands.txt</span></code> runs a sequence of commands in a single process,
+amortizing import time just like <code class="docutils literal notranslate"><span class="pre">uber</span></code>.</p></li>
+<li><p>Each non-empty, non-comment line is treated as a <code class="docutils literal notranslate"><span class="pre">qt</span></code> command.</p></li>
+<li><p>Lines ending with <code class="docutils literal notranslate"><span class="pre">\</span></code> are continued onto the next line (Python-style).</p></li>
+<li><p>Errors in individual commands do not abort the script unless the underlying
+command does.</p></li>
+</ul>
+<p>Example <code class="docutils literal notranslate"><span class="pre">my-commands.txt</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Build README TOC</span>
+<span class="n">toc</span> <span class="o">.</span> <span class="n">toc</span><span class="o">/</span><span class="n">README</span><span class="o">.</span><span class="n">tex</span>
+<span class="o">-</span><span class="n">f</span> <span class="n">README</span><span class="o">.</span><span class="n">md</span>
+<span class="c1"># Trim BibTeX</span>
+<span class="n">bibtex</span> <span class="o">.</span> <span class="o">--</span><span class="n">write</span>
+</pre></div>
+</div>
+<p>Run with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">qt</span> <span class="n">script</span> <span class="n">my</span><span class="o">-</span><span class="n">commands</span><span class="o">.</span><span class="n">txt</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h2>
+<p>Development installation:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>py<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+</pre></div>
+</div>
+<p>This installs the package in editable mode so changes are reflected immediately.</p>
+</section>
+<hr class="docutils" />
+<section id="command-line-usage">
+<h2>Command line usage<a class="headerlink" href="#command-line-usage" title="Link to this heading"></a></h2>
+<p>Using the installed console script:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>qt<span class="w"> </span><span class="o">[</span>COMMAND<span class="o">]</span><span class="w"> </span>...
+</pre></div>
+</div>
+<hr class="docutils" />
+<section id="toc-generation">
+<h3>TOC generation<a class="headerlink" href="#toc-generation" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>qt<span class="w"> </span>toc<span class="w"> </span>INPUT_PATH<span class="w"> </span>OUTPUT_FILE.tex<span class="w"> </span><span class="o">[</span>options<span class="o">]</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">INPUT_PATH</span></code> may be:</p>
+<ul class="simple">
+<li><p>a Quarto project directory containing <code class="docutils literal notranslate"><span class="pre">_quarto.yml</span></code>,</p></li>
+<li><p>an individual <code class="docutils literal notranslate"><span class="pre">.qmd</span></code> file,</p></li>
+<li><p>a standalone project <code class="docutils literal notranslate"><span class="pre">_quarto.yml</span></code> file.</p></li>
+</ul>
+<p>Useful options:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-g,</span> <span class="pre">--pattern</span></code>: glob patterns for selecting <code class="docutils literal notranslate"><span class="pre">.qmd</span></code> files,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-f,</span> <span class="pre">--file</span></code>: explicit <code class="docutils literal notranslate"><span class="pre">.qmd</span></code> files (may be given multiple times),</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-c,</span> <span class="pre">--max-columns-per-row</span></code>: wrap threshold,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-w,</span> <span class="pre">--column-width</span></code>: TikZ column width,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-h,</span> <span class="pre">--section-max-height</span></code>: max subcolumn height,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-m,</span> <span class="pre">--chapter-min-height</span></code>: min chapter box height,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-v,</span> <span class="pre">--max-levels</span></code>: limit heading depth,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-u,</span> <span class="pre">--up-level</span></code>: apply up-leveling logic,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-b,</span> <span class="pre">--balance-mode</span></code>: subcolumn packing (<code class="docutils literal notranslate"><span class="pre">stable</span></code> or <code class="docutils literal notranslate"><span class="pre">ffd</span></code>),</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-o,</span> <span class="pre">--omit</span></code>: titles to exclude,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-d,</span> <span class="pre">--debug</span></code>: annotate TikZ for diagnostics.</p></li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="id1">
+<h3>BibTeX trimming<a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>qt<span class="w"> </span>bibtex<span class="w"> </span>INPUT_PATH
+</pre></div>
+</div>
+<p>Optional:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-w,</span> <span class="pre">--write-csv</span></code>: dump internal citation/tags tables,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-o,</span> <span class="pre">--out-prefix</span></code>: filename prefix for CSV output,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--fail-on-error</span></code>: treat missing/unused entries as an error.</p></li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="cross-reference-audit">
+<h3>Cross-reference audit<a class="headerlink" href="#cross-reference-audit" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>qt<span class="w"> </span>xrefs<span class="w"> </span>INPUT_PATH
+</pre></div>
+</div>
+<p>Optional:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-w,</span> <span class="pre">--write-csv</span></code>: write full tables,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-o,</span> <span class="pre">--out-prefix</span></code>: prefix for CSV files,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-f,</span> <span class="pre">--fail-on-error</span></code>: exit with non-zero status on issues.</p></li>
+</ul>
+<p>Reports:</p>
+<ul class="simple">
+<li><p>duplicate labels,</p></li>
+<li><p>undefined references,</p></li>
+<li><p>unused labels.</p></li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="id2">
+<h3>Tidy<a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<section id="flatten-a-file">
+<h4>Flatten a file<a class="headerlink" href="#flatten-a-file" title="Link to this heading"></a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>qt<span class="w"> </span>tidy<span class="w"> </span>flatten-file<span class="w"> </span>input.qmd<span class="w"> </span>output.qmd
+</pre></div>
+</div>
+</section>
+<section id="format-files">
+<h4>Format files<a class="headerlink" href="#format-files" title="Link to this heading"></a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>qt<span class="w"> </span>tidy<span class="w"> </span>format<span class="w"> </span>INPUT_PATH<span class="w"> </span><span class="o">[</span>options<span class="o">]</span>
+</pre></div>
+</div>
+<p>Useful options:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--in-place</span></code> or <code class="docutils literal notranslate"><span class="pre">-o</span> <span class="pre">DIR</span></code>: write normalized output,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--remove-comments</span></code>: drop HTML comments outside code blocks,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--wrap-width</span> <span class="pre">N</span></code>: optional text wrapping.</p></li>
+</ul>
+</section>
+<section id="report">
+<h4>Report<a class="headerlink" href="#report" title="Link to this heading"></a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>qt<span class="w"> </span>tidy<span class="w"> </span>report<span class="w"> </span>INPUT_PATH
+</pre></div>
+</div>
+<p>Runs xrefs, bibtex checks, and Python-block enumeration.</p>
+</section>
+</section>
+<hr class="docutils" />
+<section id="testing-python-code-blocks">
+<h3>Testing Python code blocks<a class="headerlink" href="#testing-python-code-blocks" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">qpytest</span></code> group uses the shared parser in <code class="docutils literal notranslate"><span class="pre">blocks.py</span></code>.</p>
+<section id="collect-blocks">
+<h4>Collect blocks<a class="headerlink" href="#collect-blocks" title="Link to this heading"></a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>qt<span class="w"> </span>qpytest<span class="w"> </span>collect<span class="w"> </span>INPUT_PATH
+</pre></div>
+</div>
+</section>
+<section id="extract-to-py">
+<h4>Extract to <code class="docutils literal notranslate"><span class="pre">.py</span></code><a class="headerlink" href="#extract-to-py" title="Link to this heading"></a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>qt<span class="w"> </span>qpytest<span class="w"> </span>extract<span class="w"> </span>INPUT_PATH<span class="w"> </span>OUT_DIR
+</pre></div>
+</div>
+<p>Each <code class="docutils literal notranslate"><span class="pre">.qmd</span></code> becomes one <code class="docutils literal notranslate"><span class="pre">.py</span></code> script containing all code blocks.</p>
+</section>
+<section id="syntax-check-execute">
+<h4>Syntax-check / execute<a class="headerlink" href="#syntax-check-execute" title="Link to this heading"></a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>qt<span class="w"> </span>qpytest<span class="w"> </span>run<span class="w"> </span>INPUT_PATH<span class="w"> </span>--mode<span class="w"> </span>syntax
+qt<span class="w"> </span>qpytest<span class="w"> </span>run<span class="w"> </span>INPUT_PATH<span class="w"> </span>--mode<span class="w"> </span><span class="nb">exec</span>
+</pre></div>
+</div>
+<p>Execution uses an isolated IPython shell and matplotlib Agg.</p>
+</section>
+<section id="parallel-execution">
+<h4>Parallel execution<a class="headerlink" href="#parallel-execution" title="Link to this heading"></a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>qt<span class="w"> </span>qpytest<span class="w"> </span>run-parallel<span class="w"> </span>INPUT_PATH<span class="w"> </span>-n<span class="w"> </span><span class="m">4</span>
+</pre></div>
+</div>
+<p>Runs each chapter’s <code class="docutils literal notranslate"><span class="pre">.py</span></code> script in its own subprocess; useful for large books.</p>
+</section>
+</section>
+</section>
+<hr class="docutils" />
+<section id="python-api">
+<h2>Python API<a class="headerlink" href="#python-api" title="Link to this heading"></a></h2>
+<p>These tools can also be used directly from Python.</p>
+<section id="toc">
+<h3>TOC<a class="headerlink" href="#toc" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">quarto_tools.toc</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuartoToc</span>
+
+<span class="n">toc</span> <span class="o">=</span> <span class="n">QuartoToc</span><span class="p">(</span><span class="n">base_dir</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;project&quot;</span><span class="p">))</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">toc</span><span class="o">.</span><span class="n">make_df</span><span class="p">()</span>
+<span class="n">tikz</span> <span class="o">=</span> <span class="n">toc</span><span class="o">.</span><span class="n">to_tikz</span><span class="p">()</span>
+<span class="n">toc</span><span class="o">.</span><span class="n">write_tex</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;toc.tex&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</section>
+<section id="id3">
+<h3>BibTeX trimming<a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">quarto_tools.bibtex</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuartoBibTex</span>
+
+<span class="n">qb</span> <span class="o">=</span> <span class="n">QuartoBibTex</span><span class="p">(</span><span class="n">base_dir</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;project&quot;</span><span class="p">))</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">qb</span><span class="o">.</span><span class="n">make_df</span><span class="p">()</span>
+<span class="n">qb</span><span class="o">.</span><span class="n">write_bib</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;references-trimmed.bib&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</section>
+<section id="cross-references">
+<h3>Cross-references<a class="headerlink" href="#cross-references" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">quarto_tools.xref</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuartoXRefs</span>
+
+<span class="n">xr</span> <span class="o">=</span> <span class="n">QuartoXRefs</span><span class="p">(</span><span class="n">base_dir</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;project&quot;</span><span class="p">))</span>
+<span class="n">defs_df</span><span class="p">,</span> <span class="n">refs_df</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">scan</span><span class="p">()</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">validate</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="id4">
+<h3>Tidy<a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quarto_tools.tidy</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuartoTidy</span>
+
+<span class="n">t</span> <span class="o">=</span> <span class="n">QuartoTidy</span><span class="p">(</span><span class="n">base_dir</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;project&quot;</span><span class="p">))</span>
+<span class="n">t</span><span class="o">.</span><span class="n">flatten_file</span><span class="p">(</span><span class="s2">&quot;input.qmd&quot;</span><span class="p">,</span> <span class="s2">&quot;output.qmd&quot;</span><span class="p">)</span>
+<span class="n">t</span><span class="o">.</span><span class="n">format_all</span><span class="p">(</span><span class="n">in_place</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="qpytest">
+<h3>qpytest<a class="headerlink" href="#qpytest" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">quarto_tools.pytest_qmd</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuartoPyTest</span>
+
+<span class="n">qp</span> <span class="o">=</span> <span class="n">QuartoPyTest</span><span class="p">(</span><span class="n">base_dir</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;project&quot;</span><span class="p">))</span>
+<span class="n">blocks</span> <span class="o">=</span> <span class="n">qp</span><span class="o">.</span><span class="n">list_blocks</span><span class="p">()</span>
+<span class="n">qp</span><span class="o">.</span><span class="n">extract</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;out_dir&quot;</span><span class="p">))</span>
+<span class="n">qp</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;syntax&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="notes">
+<h2>Notes<a class="headerlink" href="#notes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Line endings, code blocks, HTML comments, and Pandoc attributes are handled consistently.</p></li>
+<li><p>All commands share the same INPUT_PATH resolver, ensuring predictable behavior.</p></li>
+<li><p>Code blocks are parsed using a single central lexer in <code class="docutils literal notranslate"><span class="pre">blocks.py</span></code>.</p></li>
+<li><p>Python execution uses isolated IPython shells for correctness and reproducibility.</p></li>
+<li><p>All DataFrame outputs use paths relative to <code class="docutils literal notranslate"><span class="pre">base_dir</span></code> for compactness.</p></li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="status">
+<h2>Status<a class="headerlink" href="#status" title="Link to this heading"></a></h2>
+<p>APIs are stable for daily use but continue to evolve as new Quarto features and workflows are supported.</p>
+<hr class="docutils" />
+<p>If you’d like, I can also produce:</p>
+<ul class="simple">
+<li><p>a shorter “quickstart” version,</p></li>
+<li><p>a developer-only README for maintainers,</p></li>
+<li><p>or a manpage-style help summary matching the CLI.</p></li>
+</ul>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-quarto_tools.bibtex">BibTex Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-quarto_tools.blocks">Blocks Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-quarto_tools.cli">CLI Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-quarto_tools.consolidate">Consolidate Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-quarto_tools.pytest_qmd">PyTest_qmd Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-quarto_tools.tidy">Tidy Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-quarto_tools.toc">TOC Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-quarto_tools.utils">Utils Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#module-quarto_tools.xref">XRef Module</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="api.html" class="btn btn-neutral float-right" title="API reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Stephen J. Mildenhall.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

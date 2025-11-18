@@ -1,0 +1,678 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>quarto_tools.pytest_qmd &mdash; quarto_tools  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            quarto_tools
+              <img src="../../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">quarto_tools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">quarto_tools.pytest_qmd</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for quarto_tools.pytest_qmd</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Python extraction and testing for Quarto .qmd files.</span>
+
+<span class="sd">This module is independent of tidy/xref/bibtex functionality. It provides:</span>
+
+<span class="sd">- collect_blocks: enumerate python code blocks</span>
+<span class="sd">- extract: write them to .py files (one per .qmd)</span>
+<span class="sd">- run: syntax-test or execute blocks, optionally in parallel via subprocesses</span>
+
+<span class="sd">The CLI layer should handle user interaction and pretty printing; this module</span>
+<span class="sd">focuses on data and results.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shlex</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">IPython.core.interactiveshell</span><span class="w"> </span><span class="kn">import</span> <span class="n">InteractiveShell</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.blocks</span><span class="w"> </span><span class="kn">import</span> <span class="n">CodeBlock</span><span class="p">,</span> <span class="n">extract_code_blocks</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover_quarto_sources</span>
+
+
+<div class="viewcode-block" id="QuartoPyTest">
+<a class="viewcode-back" href="../../api.html#quarto_tools.pytest_qmd.QuartoPyTest">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">QuartoPyTest</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Extract and test Python code blocks from Quarto .qmd files.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    base_dir :</span>
+<span class="sd">        Root directory for the project.</span>
+<span class="sd">    project_yaml :</span>
+<span class="sd">        Optional path to project-level _quarto.yml / _quarto.yaml.</span>
+<span class="sd">    file_patterns :</span>
+<span class="sd">        Glob patterns for source discovery (ripgrep -g style).</span>
+<span class="sd">    explicit_files :</span>
+<span class="sd">        Explicitly provided .qmd files. If non-empty, take precedence over</span>
+<span class="sd">        patterns and project yaml.</span>
+<span class="sd">    encoding :</span>
+<span class="sd">        Text encoding for reading .qmd files.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">base_dir</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">project_yaml</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">file_patterns</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">explicit_files</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;utf-8&quot;</span>
+
+    <span class="n">_sources</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="nb">repr</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="c1"># ------------------------</span>
+    <span class="c1"># Internal helpers</span>
+    <span class="c1"># ------------------------</span>
+
+<div class="viewcode-block" id="QuartoPyTest._discover_sources">
+<a class="viewcode-back" href="../../api.html#quarto_tools.pytest_qmd.QuartoPyTest._discover_sources">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_discover_sources</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Discover .qmd files using the shared project-discovery logic.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list[Path]</span>
+<span class="sd">            Source files in project order.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">discover_quarto_sources</span><span class="p">(</span>
+                <span class="n">base_dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">,</span>
+                <span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">,</span>
+                <span class="n">project_yaml</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project_yaml</span><span class="p">,</span>
+                <span class="n">file_patterns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">file_patterns</span><span class="p">,</span>
+                <span class="n">explicit_files</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">explicit_files</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span></div>
+
+
+<div class="viewcode-block" id="QuartoPyTest._collect_block_objects">
+<a class="viewcode-back" href="../../api.html#quarto_tools.pytest_qmd.QuartoPyTest._collect_block_objects">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_collect_block_objects</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">CodeBlock</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Collect CodeBlock objects for all python code blocks in the project.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list[CodeBlock]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">blocks</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">CodeBlock</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">src</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_discover_sources</span><span class="p">():</span>
+            <span class="n">text</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+            <span class="n">file_blocks</span> <span class="o">=</span> <span class="n">extract_code_blocks</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">lang</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">)</span>
+            <span class="n">blocks</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">file_blocks</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">blocks</span></div>
+
+
+    <span class="c1"># ------------------------</span>
+    <span class="c1"># Feature: collect</span>
+    <span class="c1"># ------------------------</span>
+
+<div class="viewcode-block" id="QuartoPyTest.collect_blocks">
+<a class="viewcode-back" href="../../api.html#quarto_tools.pytest_qmd.QuartoPyTest.collect_blocks">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">collect_blocks</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return a DataFrame of all Python code blocks across the project.</span>
+
+<span class="sd">        Columns</span>
+<span class="sd">        -------</span>
+<span class="sd">        file :</span>
+<span class="sd">            Path to the .qmd file, relative to base_dir.</span>
+<span class="sd">        block_index :</span>
+<span class="sd">            1-based index of the block within the file.</span>
+<span class="sd">        lang :</span>
+<span class="sd">            Language in the fence (always &quot;python&quot; here).</span>
+<span class="sd">        label :</span>
+<span class="sd">            Optional #| label: value.</span>
+<span class="sd">        caption :</span>
+<span class="sd">            Optional #| ...-cap: text.</span>
+<span class="sd">        start_line :</span>
+<span class="sd">            Starting line number of the code in the file (1-based).</span>
+<span class="sd">        end_line :</span>
+<span class="sd">            Ending line number of the code in the file (1-based).</span>
+<span class="sd">        code :</span>
+<span class="sd">            The block source code.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">blocks</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_collect_block_objects</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">blocks</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+                <span class="n">columns</span><span class="o">=</span><span class="p">[</span>
+                    <span class="s2">&quot;file&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;block_index&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;lang&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;label&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;caption&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;start_line&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;end_line&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;code&quot;</span><span class="p">,</span>
+                <span class="p">]</span>
+            <span class="p">)</span>
+
+        <span class="n">records</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">block</span> <span class="ow">in</span> <span class="n">blocks</span><span class="p">:</span>
+            <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;file&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">),</span>
+                    <span class="s2">&quot;block_index&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">block_index</span><span class="p">,</span>
+                    <span class="s2">&quot;lang&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">lang</span><span class="p">,</span>
+                    <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">label</span><span class="p">,</span>
+                    <span class="s2">&quot;caption&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">caption</span><span class="p">,</span>
+                    <span class="s2">&quot;start_line&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">start_line</span><span class="p">,</span>
+                    <span class="s2">&quot;end_line&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">end_line</span><span class="p">,</span>
+                    <span class="s2">&quot;code&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">code</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="o">.</span><span class="n">from_records</span><span class="p">(</span><span class="n">records</span><span class="p">)</span></div>
+
+
+    <span class="c1"># ------------------------</span>
+    <span class="c1"># Feature: extract</span>
+    <span class="c1"># ------------------------</span>
+
+<div class="viewcode-block" id="QuartoPyTest.extract">
+<a class="viewcode-back" href="../../api.html#quarto_tools.pytest_qmd.QuartoPyTest.extract">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extract</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extract Python blocks into .py files, one per source .qmd file.</span>
+
+<span class="sd">        For each .qmd file containing at least one python block, a .py file</span>
+<span class="sd">        is written under output_dir with a mirrored directory structure.</span>
+<span class="sd">        The .py file name is the same as the .qmd stem, with suffix .py.</span>
+
+<span class="sd">        Each block is separated by a comment header indicating its index,</span>
+<span class="sd">        label, and caption where available.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        output_dir :</span>
+<span class="sd">            Destination directory for the extracted .py files.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pandas.DataFrame</span>
+<span class="sd">            Summary with columns:</span>
+
+<span class="sd">            - file: original .qmd path, relative to base_dir</span>
+<span class="sd">            - py_file: generated .py path, relative to output_dir</span>
+<span class="sd">            - blocks: number of blocks written</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">output_dir</span> <span class="o">=</span> <span class="n">output_dir</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+        <span class="n">output_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">blocks</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_collect_block_objects</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">blocks</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+                <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;file&quot;</span><span class="p">,</span> <span class="s2">&quot;py_file&quot;</span><span class="p">,</span> <span class="s2">&quot;blocks&quot;</span><span class="p">],</span>
+            <span class="p">)</span>
+
+        <span class="n">by_file</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">CodeBlock</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">block</span> <span class="ow">in</span> <span class="n">blocks</span><span class="p">:</span>
+            <span class="n">by_file</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">file</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">block</span><span class="p">)</span>
+
+        <span class="n">records</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">src</span><span class="p">,</span> <span class="n">file_blocks</span> <span class="ow">in</span> <span class="n">by_file</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">file_blocks</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">b</span><span class="p">:</span> <span class="n">b</span><span class="o">.</span><span class="n">block_index</span><span class="p">)</span>
+
+            <span class="n">rel</span> <span class="o">=</span> <span class="n">src</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">)</span>
+            <span class="n">py_path</span> <span class="o">=</span> <span class="p">(</span><span class="n">output_dir</span> <span class="o">/</span> <span class="n">rel</span><span class="p">)</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.py&quot;</span><span class="p">)</span>
+            <span class="n">py_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="n">lines</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">block</span> <span class="ow">in</span> <span class="n">file_blocks</span><span class="p">:</span>
+                <span class="n">header_parts</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;# === Block </span><span class="si">{</span><span class="n">block</span><span class="o">.</span><span class="n">block_index</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">block</span><span class="o">.</span><span class="n">label</span><span class="p">:</span>
+                    <span class="n">header_parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;label=</span><span class="si">{</span><span class="n">block</span><span class="o">.</span><span class="n">label</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">block</span><span class="o">.</span><span class="n">caption</span><span class="p">:</span>
+                    <span class="n">header_parts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;caption=</span><span class="si">{</span><span class="n">block</span><span class="o">.</span><span class="n">caption</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">header</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">header_parts</span><span class="p">)</span>
+                <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
+                <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">code</span><span class="p">)</span>
+                <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+            <span class="n">text</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">text</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">text</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">):</span>
+                <span class="n">text</span> <span class="o">=</span> <span class="n">text</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+
+            <span class="n">py_path</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+
+            <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;file&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="p">,</span>
+                    <span class="s2">&quot;py_file&quot;</span><span class="p">:</span> <span class="n">py_path</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="n">output_dir</span><span class="p">),</span>
+                    <span class="s2">&quot;blocks&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">file_blocks</span><span class="p">),</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="o">.</span><span class="n">from_records</span><span class="p">(</span><span class="n">records</span><span class="p">)</span></div>
+
+
+    <span class="c1"># ------------------------</span>
+    <span class="c1"># Feature: run (single-process)</span>
+    <span class="c1"># ------------------------</span>
+
+<div class="viewcode-block" id="QuartoPyTest.run">
+<a class="viewcode-back" href="../../api.html#quarto_tools.pytest_qmd.QuartoPyTest.run">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;syntax&quot;</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Test Python code blocks in a single process.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        mode :</span>
+<span class="sd">            Either &quot;syntax&quot; or &quot;exec&quot;.</span>
+
+<span class="sd">            - &quot;syntax&quot;: only compile each block with compile(..., &#39;exec&#39;).</span>
+<span class="sd">              No code is executed; this checks for SyntaxError only.</span>
+<span class="sd">            - &quot;exec&quot;: execute each block in an IPython InteractiveShell</span>
+<span class="sd">              instance with matplotlib using the &quot;Agg&quot; backend.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pandas.DataFrame</span>
+<span class="sd">            One row per block with columns:</span>
+
+<span class="sd">            - file: .qmd path relative to base_dir</span>
+<span class="sd">            - block_index</span>
+<span class="sd">            - label</span>
+<span class="sd">            - mode</span>
+<span class="sd">            - ok: True if compile/exec succeeded, False otherwise</span>
+<span class="sd">            - error_type: exception class name (or None)</span>
+<span class="sd">            - error_message: string message (or None)</span>
+<span class="sd">            - lineno: error line number within the block, if available</span>
+<span class="sd">            - col_offset: error column offset, if available</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mode</span> <span class="o">=</span> <span class="n">mode</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">mode</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;syntax&quot;</span><span class="p">,</span> <span class="s2">&quot;exec&quot;</span><span class="p">}:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;mode must be &#39;syntax&#39; or &#39;exec&#39;&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="n">blocks</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_collect_block_objects</span><span class="p">()</span>
+        <span class="n">records</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">shell</span><span class="p">:</span> <span class="n">InteractiveShell</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;exec&quot;</span><span class="p">:</span>
+            <span class="n">matplotlib</span><span class="o">.</span><span class="n">use</span><span class="p">(</span><span class="s2">&quot;Agg&quot;</span><span class="p">)</span>
+            <span class="n">shell</span> <span class="o">=</span> <span class="n">InteractiveShell</span><span class="o">.</span><span class="n">instance</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">block</span> <span class="ow">in</span> <span class="n">blocks</span><span class="p">:</span>
+            <span class="n">rel</span> <span class="o">=</span> <span class="n">block</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">)</span>
+            <span class="n">ok</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">error_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">error_message</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">lineno</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">col_offset</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+            <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;syntax&quot;</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="nb">compile</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">file</span><span class="p">),</span> <span class="s2">&quot;exec&quot;</span><span class="p">)</span>
+                    <span class="n">ok</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">except</span> <span class="ne">SyntaxError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                    <span class="n">error_type</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span>
+                    <span class="n">error_message</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+                    <span class="n">lineno</span> <span class="o">=</span> <span class="n">exc</span><span class="o">.</span><span class="n">lineno</span>
+                    <span class="n">col_offset</span> <span class="o">=</span> <span class="n">exc</span><span class="o">.</span><span class="n">offset</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                    <span class="n">error_type</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span>
+                    <span class="n">error_message</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">assert</span> <span class="n">shell</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                    <span class="n">result</span> <span class="o">=</span> <span class="n">shell</span><span class="o">.</span><span class="n">run_cell</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="n">store_history</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                    <span class="n">ok</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">success</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">ok</span> <span class="ow">and</span> <span class="n">result</span><span class="o">.</span><span class="n">error_in_exec</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">exc</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">error_in_exec</span>
+                        <span class="n">error_type</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span>
+                        <span class="n">error_message</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="s2">&quot;lineno&quot;</span><span class="p">):</span>
+                            <span class="n">lineno</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="s2">&quot;lineno&quot;</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="s2">&quot;offset&quot;</span><span class="p">):</span>
+                            <span class="n">col_offset</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="s2">&quot;offset&quot;</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                    <span class="n">error_type</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span>
+                    <span class="n">error_message</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+
+            <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;file&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="p">,</span>
+                    <span class="s2">&quot;block_index&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">block_index</span><span class="p">,</span>
+                    <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">label</span><span class="p">,</span>
+                    <span class="s2">&quot;mode&quot;</span><span class="p">:</span> <span class="n">mode</span><span class="p">,</span>
+                    <span class="s2">&quot;ok&quot;</span><span class="p">:</span> <span class="n">ok</span><span class="p">,</span>
+                    <span class="s2">&quot;error_type&quot;</span><span class="p">:</span> <span class="n">error_type</span><span class="p">,</span>
+                    <span class="s2">&quot;error_message&quot;</span><span class="p">:</span> <span class="n">error_message</span><span class="p">,</span>
+                    <span class="s2">&quot;lineno&quot;</span><span class="p">:</span> <span class="n">lineno</span><span class="p">,</span>
+                    <span class="s2">&quot;col_offset&quot;</span><span class="p">:</span> <span class="n">col_offset</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">records</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+                <span class="n">columns</span><span class="o">=</span><span class="p">[</span>
+                    <span class="s2">&quot;file&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;block_index&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;label&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;mode&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;ok&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;error_type&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;error_message&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;lineno&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;col_offset&quot;</span><span class="p">,</span>
+                <span class="p">]</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="o">.</span><span class="n">from_records</span><span class="p">(</span><span class="n">records</span><span class="p">)</span></div>
+
+
+    <span class="c1"># ------------------------</span>
+    <span class="c1"># Feature: run in parallel (per chapter)</span>
+    <span class="c1"># ------------------------</span>
+
+<div class="viewcode-block" id="QuartoPyTest._run_script_worker">
+<a class="viewcode-back" href="../../api.html#quarto_tools.pytest_qmd.QuartoPyTest._run_script_worker">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_run_script_worker</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">queue</span><span class="p">:</span> <span class="s2">&quot;asyncio.Queue[Path]&quot;</span><span class="p">,</span>
+        <span class="n">results</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Async worker: run ipython script.py for queued scripts.</span>
+
+<span class="sd">        Results are stored in the shared &#39;results&#39; dict keyed by script path.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">script</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="k">await</span> <span class="n">queue</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">cmd</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;ipython </span><span class="si">{</span><span class="n">script</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="n">args</span> <span class="o">=</span> <span class="n">shlex</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">posix</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+                <span class="n">proc</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_subprocess_exec</span><span class="p">(</span>
+                    <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+                    <span class="n">stdout</span><span class="o">=</span><span class="n">asyncio</span><span class="o">.</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+                    <span class="n">stderr</span><span class="o">=</span><span class="n">asyncio</span><span class="o">.</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+                <span class="p">)</span>
+
+                <span class="n">stdout</span><span class="p">,</span> <span class="n">stderr</span> <span class="o">=</span> <span class="k">await</span> <span class="n">proc</span><span class="o">.</span><span class="n">communicate</span><span class="p">()</span>
+                <span class="n">rc</span> <span class="o">=</span> <span class="n">proc</span><span class="o">.</span><span class="n">returncode</span>
+
+                <span class="n">so</span> <span class="o">=</span> <span class="n">stdout</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;replace&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">stdout</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+                <span class="n">se</span> <span class="o">=</span> <span class="n">stderr</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;replace&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">stderr</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+
+                <span class="c1"># Write outputs next to the script.</span>
+                <span class="k">if</span> <span class="n">so</span><span class="p">:</span>
+                    <span class="n">script</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.output&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">so</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">se</span><span class="p">:</span>
+                    <span class="n">script</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.stderr&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">se</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+
+                <span class="c1"># Optional .error file if non-zero return code.</span>
+                <span class="k">if</span> <span class="n">rc</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">err_text</span> <span class="o">=</span> <span class="n">se</span> <span class="ow">or</span> <span class="n">so</span>
+                    <span class="k">if</span> <span class="n">err_text</span><span class="p">:</span>
+                        <span class="n">script</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.error&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span>
+                            <span class="n">err_text</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span>
+                        <span class="p">)</span>
+
+                <span class="n">results</span><span class="p">[</span><span class="n">script</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;returncode&quot;</span><span class="p">:</span> <span class="n">rc</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="k">finally</span><span class="p">:</span>
+                <span class="n">queue</span><span class="o">.</span><span class="n">task_done</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="QuartoPyTest._run_scripts_parallel">
+<a class="viewcode-back" href="../../api.html#quarto_tools.pytest_qmd.QuartoPyTest._run_scripts_parallel">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_run_scripts_parallel</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">scripts</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span>
+        <span class="n">n_workers</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Run scripts in parallel using asyncio subprocesses.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        scripts :</span>
+<span class="sd">            List of script paths to run with ipython.</span>
+<span class="sd">        n_workers :</span>
+<span class="sd">            Number of concurrent workers.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict</span>
+<span class="sd">            Mapping script path -&gt; result dict (currently only &#39;returncode&#39;).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">queue</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Queue</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Queue</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">script</span> <span class="ow">in</span> <span class="n">scripts</span><span class="p">:</span>
+            <span class="n">queue</span><span class="o">.</span><span class="n">put_nowait</span><span class="p">(</span><span class="n">script</span><span class="p">)</span>
+
+        <span class="n">results</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="n">tasks</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span><span class="p">[</span><span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_workers</span><span class="p">):</span>
+            <span class="n">task</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_run_script_worker</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;worker-</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">queue</span><span class="p">,</span> <span class="n">results</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">tasks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">task</span><span class="p">)</span>
+
+        <span class="k">await</span> <span class="n">queue</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">task</span> <span class="ow">in</span> <span class="n">tasks</span><span class="p">:</span>
+            <span class="n">task</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span>
+        <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span><span class="o">*</span><span class="n">tasks</span><span class="p">,</span> <span class="n">return_exceptions</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">results</span></div>
+
+
+<div class="viewcode-block" id="QuartoPyTest.run_parallel">
+<a class="viewcode-back" href="../../api.html#quarto_tools.pytest_qmd.QuartoPyTest.run_parallel">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_parallel</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">output_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">n_workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Execute chapters in parallel as independent scripts.</span>
+
+<span class="sd">        This mode:</span>
+<span class="sd">        - extracts one .py per .qmd with python blocks,</span>
+<span class="sd">        - runs `ipython chapter.py` in parallel,</span>
+<span class="sd">        - writes .output/.stderr/.error files per chapter,</span>
+<span class="sd">        - maps the chapter result back to all its blocks.</span>
+
+<span class="sd">        It does NOT tell you which specific block failed, only that the</span>
+<span class="sd">        chapter script as a whole succeeded or failed.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        output_dir :</span>
+<span class="sd">            Directory to write the extracted .py scripts.</span>
+<span class="sd">            If None, use base_dir / &quot;.qpytest&quot;.</span>
+<span class="sd">        n_workers :</span>
+<span class="sd">            Number of concurrent workers.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pandas.DataFrame</span>
+<span class="sd">            One row per block with columns:</span>
+
+<span class="sd">            - file: .qmd path relative to base_dir</span>
+<span class="sd">            - block_index</span>
+<span class="sd">            - label</span>
+<span class="sd">            - mode: &quot;exec-parallel&quot;</span>
+<span class="sd">            - ok: True if the chapter script exit code was 0</span>
+<span class="sd">            - error_type: None or &quot;SubprocessError&quot;</span>
+<span class="sd">            - error_message: message including the return code</span>
+<span class="sd">            - lineno, col_offset: always None (no block-level info here)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">output_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">output_dir</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span> <span class="o">/</span> <span class="s2">&quot;.qpytest&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">output_dir</span> <span class="o">=</span> <span class="n">output_dir</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+
+        <span class="n">extract_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">extract</span><span class="p">(</span><span class="n">output_dir</span><span class="o">=</span><span class="n">output_dir</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">extract_df</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+                <span class="n">columns</span><span class="o">=</span><span class="p">[</span>
+                    <span class="s2">&quot;file&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;block_index&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;label&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;mode&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;ok&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;error_type&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;error_message&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;lineno&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;col_offset&quot;</span><span class="p">,</span>
+                <span class="p">]</span>
+            <span class="p">)</span>
+
+        <span class="n">scripts</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">qmd_for_script</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">extract_df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="n">rel_qmd</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;file&quot;</span><span class="p">]</span>
+            <span class="n">rel_py</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;py_file&quot;</span><span class="p">]</span>
+            <span class="n">script_path</span> <span class="o">=</span> <span class="n">output_dir</span> <span class="o">/</span> <span class="n">rel_py</span>
+            <span class="n">scripts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">script_path</span><span class="p">)</span>
+            <span class="n">qmd_for_script</span><span class="p">[</span><span class="n">script_path</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span> <span class="o">/</span> <span class="n">rel_qmd</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+
+        <span class="n">results</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_run_scripts_parallel</span><span class="p">(</span><span class="n">scripts</span><span class="p">,</span> <span class="n">n_workers</span><span class="o">=</span><span class="n">n_workers</span><span class="p">))</span>
+
+        <span class="c1"># Map from qmd absolute path -&gt; returncode</span>
+        <span class="n">rc_by_qmd</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">script_path</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">results</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">qmd_path</span> <span class="o">=</span> <span class="n">qmd_for_script</span><span class="p">[</span><span class="n">script_path</span><span class="p">]</span>
+            <span class="n">rc_by_qmd</span><span class="p">[</span><span class="n">qmd_path</span><span class="p">]</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;returncode&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">blocks</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_collect_block_objects</span><span class="p">()</span>
+        <span class="n">records</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">block</span> <span class="ow">in</span> <span class="n">blocks</span><span class="p">:</span>
+            <span class="n">rel</span> <span class="o">=</span> <span class="n">block</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">)</span>
+            <span class="n">rc</span> <span class="o">=</span> <span class="n">rc_by_qmd</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">file</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">ok</span> <span class="o">=</span> <span class="n">rc</span> <span class="o">==</span> <span class="mi">0</span>
+            <span class="n">error_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">error_message</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">ok</span><span class="p">:</span>
+                <span class="n">error_type</span> <span class="o">=</span> <span class="s2">&quot;SubprocessError&quot;</span>
+                <span class="n">error_message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;ipython exited with code </span><span class="si">{</span><span class="n">rc</span><span class="si">}</span><span class="s2"> for chapter&quot;</span>
+
+            <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;file&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="p">,</span>
+                    <span class="s2">&quot;block_index&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">block_index</span><span class="p">,</span>
+                    <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="n">block</span><span class="o">.</span><span class="n">label</span><span class="p">,</span>
+                    <span class="s2">&quot;mode&quot;</span><span class="p">:</span> <span class="s2">&quot;exec-parallel&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;ok&quot;</span><span class="p">:</span> <span class="n">ok</span><span class="p">,</span>
+                    <span class="s2">&quot;error_type&quot;</span><span class="p">:</span> <span class="n">error_type</span><span class="p">,</span>
+                    <span class="s2">&quot;error_message&quot;</span><span class="p">:</span> <span class="n">error_message</span><span class="p">,</span>
+                    <span class="s2">&quot;lineno&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                    <span class="s2">&quot;col_offset&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="o">.</span><span class="n">from_records</span><span class="p">(</span><span class="n">records</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Stephen J. Mildenhall.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

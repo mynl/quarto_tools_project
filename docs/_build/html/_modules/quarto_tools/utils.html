@@ -1,0 +1,558 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>quarto_tools.utils &mdash; quarto_tools  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            quarto_tools
+              <img src="../../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">quarto_tools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">quarto_tools.utils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for quarto_tools.utils</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Shared utilities for quarto_tools.</span>
+
+<span class="sd">This module provides functions for:</span>
+
+<span class="sd">- Discovering Quarto project sources (qmd files) in the correct order.</span>
+<span class="sd">- Extracting YAML front matter and body from .qmd files.</span>
+<span class="sd">- Stripping code blocks and comments from lines for text-only processing.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+
+
+<span class="c1"># Common Quarto cross-reference prefixes and suffixes, used by both</span>
+<span class="c1"># BibTeX and cross-reference tools.</span>
+<span class="n">QUARTO_XREF_PREFIXES</span> <span class="o">=</span> <span class="s2">&quot;sec|fig|tbl|eq|ch|def|thm|exr|exm|lem|prp|nte|sol|REF&quot;</span>
+<span class="n">QUARTO_XREF_SUFFIXES</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;:\.\:\-_&quot;</span>
+
+
+<div class="viewcode-block" id="discover_quarto_sources">
+<a class="viewcode-back" href="../../api.html#quarto_tools.utils.discover_quarto_sources">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">discover_quarto_sources</span><span class="p">(</span>
+    <span class="n">base_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;utf-8&quot;</span><span class="p">,</span>
+    <span class="n">project_yaml</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">file_patterns</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
+    <span class="n">explicit_files</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Discover Quarto source files for a project.</span>
+
+<span class="sd">    Precedence:</span>
+<span class="sd">      1) explicit_files (if non-empty),</span>
+<span class="sd">      2) file_patterns (globs under base_dir),</span>
+<span class="sd">      3) project_yaml or auto-detected _quarto.(yml|yaml) with chapters/includes.</span>
+
+<span class="sd">    Returns a pair (sources, project_title) where:</span>
+<span class="sd">      - sources is a list of .qmd files in document order,</span>
+<span class="sd">      - project_title is the project title if found in _quarto.(yml|yaml), else None.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># 1) explicit files take absolute precedence</span>
+    <span class="k">if</span> <span class="n">explicit_files</span><span class="p">:</span>
+        <span class="n">sources</span> <span class="o">=</span> <span class="p">[</span><span class="n">Path</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">explicit_files</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">sources</span><span class="p">,</span> <span class="kc">None</span>
+
+    <span class="c1"># 2) glob patterns under base_dir</span>
+    <span class="k">if</span> <span class="n">file_patterns</span><span class="p">:</span>
+        <span class="n">sources</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">pattern</span> <span class="ow">in</span> <span class="n">file_patterns</span><span class="p">:</span>
+            <span class="c1"># preserve order per-pattern; glob returns in arbitrary order,</span>
+            <span class="c1"># so sort to keep behavior stable</span>
+            <span class="n">matches</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">base_dir</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">pattern</span><span class="p">))</span>
+            <span class="n">sources</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">matches</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">sources</span><span class="p">:</span>
+            <span class="n">patterns_str</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">repr</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">file_patterns</span><span class="p">)</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;No files matched patterns (</span><span class="si">{</span><span class="n">patterns_str</span><span class="si">}</span><span class="s2">) under </span><span class="si">{</span><span class="n">base_dir</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">sources</span><span class="p">,</span> <span class="kc">None</span>
+
+    <span class="c1"># 3) project mode via _quarto.(yml|yaml)</span>
+    <span class="k">if</span> <span class="n">project_yaml</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">yaml_path</span> <span class="o">=</span> <span class="n">project_yaml</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># auto-detect _quarto.yml / _quarto.yaml under base_dir</span>
+        <span class="n">yaml_yml</span> <span class="o">=</span> <span class="n">base_dir</span> <span class="o">/</span> <span class="s2">&quot;_quarto.yml&quot;</span>
+        <span class="n">yaml_yaml</span> <span class="o">=</span> <span class="n">base_dir</span> <span class="o">/</span> <span class="s2">&quot;_quarto.yaml&quot;</span>
+        <span class="k">if</span> <span class="n">yaml_yml</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="n">yaml_path</span> <span class="o">=</span> <span class="n">yaml_yml</span>
+        <span class="k">elif</span> <span class="n">yaml_yaml</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="n">yaml_path</span> <span class="o">=</span> <span class="n">yaml_yaml</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">&quot;Cannot find _quarto.yml or _quarto.yaml and no explicit files or &quot;</span>
+                <span class="s2">&quot;patterns provided.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="n">yaml_text</span> <span class="o">=</span> <span class="n">yaml_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">)</span>
+    <span class="n">yaml_split</span> <span class="o">=</span> <span class="n">yaml_text</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">project_title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="c1"># extract project title, if present (simple one-line &#39;title:&#39; only)</span>
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">yaml_split</span><span class="p">:</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;title:&quot;</span><span class="p">):</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">s</span><span class="p">[</span><span class="mi">6</span><span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;: &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">val</span> <span class="ow">and</span> <span class="n">val</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="s2">&quot;</span><span class="se">\&quot;</span><span class="s2">&#39;&quot;</span><span class="p">:</span>
+                <span class="n">val</span> <span class="o">=</span> <span class="n">val</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+            <span class="k">if</span> <span class="n">val</span> <span class="ow">and</span> <span class="n">val</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="s2">&quot;</span><span class="se">\&quot;</span><span class="s2">&#39;&quot;</span><span class="p">:</span>
+                <span class="n">val</span> <span class="o">=</span> <span class="n">val</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">project_title</span> <span class="o">=</span> <span class="n">val</span> <span class="ow">or</span> <span class="kc">None</span>
+            <span class="k">break</span>
+
+    <span class="c1"># chapters + includes, preserving order, using a simple YAML-like scan</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">yaml_split</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;  chapters:&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Cannot find &#39;  chapters:&#39; block in project YAML.&quot;</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+
+    <span class="n">sources</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">yaml_split</span><span class="p">[</span><span class="n">start</span><span class="p">:]:</span>
+        <span class="c1"># Expect lines like &quot;    - 010-intro.qmd&quot;</span>
+        <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;    - &quot;</span><span class="p">):</span>
+            <span class="n">fn</span> <span class="o">=</span> <span class="n">line</span><span class="p">[</span><span class="mi">6</span><span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">fn</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">part_file_path</span> <span class="o">=</span> <span class="n">base_dir</span> <span class="o">/</span> <span class="n">fn</span>
+            <span class="n">sources</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">part_file_path</span><span class="p">)</span>
+
+            <span class="c1"># Collect any {{&lt; include ... &gt;}} directives inside the part file</span>
+            <span class="n">text</span> <span class="o">=</span> <span class="n">part_file_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">)</span>
+            <span class="n">includes</span> <span class="o">=</span> <span class="p">[</span><span class="n">ln</span> <span class="k">for</span> <span class="n">ln</span> <span class="ow">in</span> <span class="n">text</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">ln</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;{{&lt; include &quot;</span><span class="p">)]</span>
+            <span class="k">for</span> <span class="n">inc_line</span> <span class="ow">in</span> <span class="n">includes</span><span class="p">:</span>
+                <span class="c1"># Example form: {{&lt; include 020-files/finance.qmd &gt;}}</span>
+                <span class="n">inc</span> <span class="o">=</span> <span class="n">inc_line</span><span class="p">[</span><span class="mi">12</span><span class="p">:</span><span class="o">-</span><span class="mi">4</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">inc</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">include_path</span> <span class="o">=</span> <span class="n">part_file_path</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="n">inc</span>
+                <span class="n">sources</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">include_path</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Stop when we leave the &quot;    - &quot; block</span>
+            <span class="k">break</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">sources</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;No chapter files discovered from project YAML.&quot;</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sources</span><span class="p">,</span> <span class="n">project_title</span></div>
+
+
+
+<div class="viewcode-block" id="extract_front_matter">
+<a class="viewcode-back" href="../../api.html#quarto_tools.utils.extract_front_matter">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">extract_front_matter</span><span class="p">(</span>
+    <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Extract YAML front matter and return (doc_title, body_lines, meta_dict).</span>
+
+<span class="sd">    If the file does not start with &#39;---&#39; on the first line, there is no</span>
+<span class="sd">    front matter, doc_title is None, body_lines is the full file, and</span>
+<span class="sd">    meta_dict is empty.</span>
+
+<span class="sd">    The parser is intentionally minimal and only understands a small subset</span>
+<span class="sd">    of YAML:</span>
+<span class="sd">      - &#39;title: ...&#39; as a single-line string.</span>
+<span class="sd">      - &#39;bibliography: something.bib&#39;</span>
+<span class="sd">      - &#39;bibliography: [a.bib, b.bib]&#39;</span>
+<span class="sd">      - multi-line lists:</span>
+
+<span class="sd">          bibliography:</span>
+<span class="sd">            - a.bib</span>
+<span class="sd">            - b.bib</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">lines</span> <span class="o">=</span> <span class="n">text</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">lines</span> <span class="ow">or</span> <span class="n">lines</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">&quot;---&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">lines</span><span class="p">,</span> <span class="p">{}</span>
+
+    <span class="n">end_idx</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">lines</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;---&quot;</span><span class="p">:</span>
+            <span class="n">end_idx</span> <span class="o">=</span> <span class="n">i</span>
+            <span class="k">break</span>
+
+    <span class="k">if</span> <span class="n">end_idx</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Unterminated front matter; treat whole file as body</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">lines</span><span class="p">,</span> <span class="p">{}</span>
+
+    <span class="n">front</span> <span class="o">=</span> <span class="n">lines</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="n">end_idx</span><span class="p">]</span>
+    <span class="n">body</span> <span class="o">=</span> <span class="n">lines</span><span class="p">[</span><span class="n">end_idx</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:]</span>
+
+    <span class="n">doc_title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">bib_paths</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">while</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">front</span><span class="p">):</span>
+        <span class="n">raw</span> <span class="o">=</span> <span class="n">front</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">raw</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+        <span class="c1"># title: ...</span>
+        <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;title:&quot;</span><span class="p">):</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">s</span><span class="p">[</span><span class="mi">6</span><span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;: &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">val</span> <span class="ow">and</span> <span class="n">val</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="s2">&quot;</span><span class="se">\&quot;</span><span class="s2">&#39;&quot;</span><span class="p">:</span>
+                <span class="n">val</span> <span class="o">=</span> <span class="n">val</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+            <span class="k">if</span> <span class="n">val</span> <span class="ow">and</span> <span class="n">val</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="s2">&quot;</span><span class="se">\&quot;</span><span class="s2">&#39;&quot;</span><span class="p">:</span>
+                <span class="n">val</span> <span class="o">=</span> <span class="n">val</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">doc_title</span> <span class="o">=</span> <span class="n">val</span> <span class="ow">or</span> <span class="n">doc_title</span>
+            <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">continue</span>
+
+        <span class="c1"># bibliography: ...</span>
+        <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;bibliography:&quot;</span><span class="p">):</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">s</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;bibliography:&quot;</span><span class="p">)</span> <span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+            <span class="c1"># Inline list: bibliography: [a.bib, b.bib]</span>
+            <span class="k">if</span> <span class="n">val</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;[&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">val</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;]&quot;</span><span class="p">):</span>
+                <span class="n">inner</span> <span class="o">=</span> <span class="n">val</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">piece</span> <span class="ow">in</span> <span class="n">inner</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">):</span>
+                    <span class="n">entry</span> <span class="o">=</span> <span class="n">piece</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\&quot;</span><span class="s2">&#39;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">entry</span><span class="p">:</span>
+                        <span class="n">bib_paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+                <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># Single value on same line: bibliography: refs.bib</span>
+            <span class="k">if</span> <span class="n">val</span><span class="p">:</span>
+                <span class="n">entry</span> <span class="o">=</span> <span class="n">val</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\&quot;</span><span class="s2">&#39;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">entry</span><span class="p">:</span>
+                    <span class="n">bib_paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+                <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># Multi-line list:</span>
+            <span class="c1"># bibliography:</span>
+            <span class="c1">#   - a.bib</span>
+            <span class="c1">#   - b.bib</span>
+            <span class="n">j</span> <span class="o">=</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="k">while</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">front</span><span class="p">):</span>
+                <span class="n">nxt</span> <span class="o">=</span> <span class="n">front</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+                <span class="c1"># Stop on a non-indented or blank line</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">nxt</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+                    <span class="k">break</span>
+                <span class="n">stripped</span> <span class="o">=</span> <span class="n">nxt</span><span class="o">.</span><span class="n">lstrip</span><span class="p">()</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">stripped</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;- &quot;</span><span class="p">):</span>
+                    <span class="k">break</span>
+                <span class="n">entry</span> <span class="o">=</span> <span class="n">stripped</span><span class="p">[</span><span class="mi">2</span><span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\&quot;</span><span class="s2">&#39;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">entry</span><span class="p">:</span>
+                    <span class="n">bib_paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+                <span class="n">j</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="n">j</span>
+            <span class="k">continue</span>
+
+        <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="n">meta</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">doc_title</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">meta</span><span class="p">[</span><span class="s2">&quot;title&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">doc_title</span>
+    <span class="k">if</span> <span class="n">bib_paths</span><span class="p">:</span>
+        <span class="c1"># Always normalize to a list of paths; caller can flatten if desired.</span>
+        <span class="n">meta</span><span class="p">[</span><span class="s2">&quot;bibliography&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">bib_paths</span>
+
+    <span class="k">return</span> <span class="n">doc_title</span><span class="p">,</span> <span class="n">body</span><span class="p">,</span> <span class="n">meta</span></div>
+
+
+
+<div class="viewcode-block" id="strip_code_blocks">
+<a class="viewcode-back" href="../../api.html#quarto_tools.utils.strip_code_blocks">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">strip_code_blocks</span><span class="p">(</span><span class="n">lines</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Remove fenced code blocks and HTML comments from an iterable of lines.</span>
+
+<span class="sd">    This mirrors the behavior used in the original QuartoToc parser:</span>
+
+<span class="sd">      - Lines starting or ending fenced code blocks (```).</span>
+<span class="sd">      - HTML comments &lt;!-- ... --&gt; treated as code/comment regions.</span>
+
+<span class="sd">    The parser toggles an &#39;incode&#39; flag whenever it encounters a code/comment</span>
+<span class="sd">    marker and drops lines while incode is True.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">incode_rex</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^```|&lt;!\-\-|\-\-&gt;|&lt;!\-\-.*?\-\-&gt;&quot;</span><span class="p">)</span>
+    <span class="n">incode</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">out</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span>
+        <span class="c1"># Toggle in/out of code or HTML comment blocks based on markers</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">incode_rex</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">line</span><span class="p">):</span>
+            <span class="n">incode</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">incode</span>
+
+        <span class="k">if</span> <span class="n">incode</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">out</span></div>
+
+
+
+<div class="viewcode-block" id="git_info">
+<a class="viewcode-back" href="../../api.html#quarto_tools.utils.git_info">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">git_info</span><span class="p">(</span><span class="n">base_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return (commit_short, state) for the repo at base_dir.</span>
+<span class="sd">    commit_short is like &#39;a1b2c3d&#39;; state is &#39;clean&#39; or &#39;dirty&#39;.</span>
+<span class="sd">    Falls back to (&#39;no-git&#39;, &#39;n/a&#39;) if not a git repo or git unavailable.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">subprocess</span><span class="w"> </span><span class="kn">import</span> <span class="n">run</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">head</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span>
+            <span class="p">[</span><span class="s2">&quot;git&quot;</span><span class="p">,</span> <span class="s2">&quot;-C&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">base_dir</span><span class="p">),</span> <span class="s2">&quot;rev-parse&quot;</span><span class="p">,</span> <span class="s2">&quot;--short=7&quot;</span><span class="p">,</span> <span class="s2">&quot;HEAD&quot;</span><span class="p">],</span>
+            <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="n">dirty</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span>
+            <span class="p">[</span><span class="s2">&quot;git&quot;</span><span class="p">,</span> <span class="s2">&quot;-C&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">base_dir</span><span class="p">),</span> <span class="s2">&quot;status&quot;</span><span class="p">,</span> <span class="s2">&quot;--porcelain&quot;</span><span class="p">],</span>
+            <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">head</span> <span class="ow">or</span> <span class="s2">&quot;no-git&quot;</span><span class="p">,</span> <span class="s2">&quot;clean&quot;</span> <span class="k">if</span> <span class="n">dirty</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span> <span class="k">else</span> <span class="s2">&quot;dirty&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span><span class="s2">&quot;no-git&quot;</span><span class="p">,</span> <span class="s2">&quot;n/a&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="resolve_quarto_context">
+<a class="viewcode-back" href="../../api.html#quarto_tools.utils.resolve_quarto_context">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">resolve_quarto_context</span><span class="p">(</span>
+    <span class="n">input_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">explicit_files</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
+    <span class="n">file_patterns</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Resolve INPUT_PATH into a canonical Quarto project context.</span>
+
+<span class="sd">    Used only in CLI!</span>
+
+<span class="sd">    This function centralizes all path/YAML discovery rules used by the</span>
+<span class="sd">    quarto_tools CLI (tidy, toc, xref, bibtex, pytest).  All commands should</span>
+<span class="sd">    use this function so that project discovery behaves consistently.</span>
+
+<span class="sd">    INPUT_PATH may refer to any of the following:</span>
+
+<span class="sd">      (A) A directory containing a _quarto.yml or _quarto.yaml file.</span>
+<span class="sd">          → Treated as a Quarto project root.</span>
+<span class="sd">          → All project files (chapters, posts, etc.) are discovered using</span>
+<span class="sd">            the YAML file.  file_patterns and explicit_files may override</span>
+<span class="sd">            this if provided.</span>
+
+<span class="sd">      (B) A directory without a Quarto YAML file.</span>
+<span class="sd">          → Treated as a generic folder of .qmd files.</span>
+<span class="sd">          → Discovery falls back to file_patterns (glob-like) or, if none</span>
+<span class="sd">            are supplied, to the default “all .qmd files under directory”.</span>
+<span class="sd">          → explicit_files may override this.</span>
+
+<span class="sd">      (C) A single .qmd file.</span>
+<span class="sd">          → Treated as a one-file “project”.</span>
+<span class="sd">          → base_dir is set to the file’s parent.</span>
+<span class="sd">          → project_yaml is None.</span>
+<span class="sd">          → Unless explicit_files is already given, the .qmd file becomes</span>
+<span class="sd">            the only explicit source file and patterns are ignored.</span>
+
+<span class="sd">      (D) A standalone _quarto.yml / _quarto.yaml file.</span>
+<span class="sd">          → Treated as the project YAML for its parent directory.</span>
+<span class="sd">          → This behaves like case (A) except discovery is forced to use</span>
+<span class="sd">            this YAML file (even if the directory contains multiple YAMLs).</span>
+
+<span class="sd">      (E) Any other file-like path.</span>
+<span class="sd">          → Treated as an atypical case with no YAML.</span>
+<span class="sd">          → base_dir is input_path.parent.</span>
+<span class="sd">          → project_yaml = None.</span>
+<span class="sd">          → file_patterns governs discovery unless explicit_files overrides it.</span>
+
+
+<span class="sd">    ORDER OF OPERATIONS (resolution algorithm):</span>
+
+<span class="sd">    1. Normalize and resolve INPUT_PATH:</span>
+<span class="sd">         input_path = input_path.resolve()</span>
+
+<span class="sd">    2. If INPUT_PATH is a directory:</span>
+<span class="sd">         a. Check for _quarto.yml/_quarto.yaml inside it.</span>
+<span class="sd">         b. If found → project directory (case A).</span>
+<span class="sd">         c. If not found → generic directory (case B).</span>
+<span class="sd">         d. In either case, file_patterns and explicit_files apply normally.</span>
+
+<span class="sd">    3. If INPUT_PATH is a .qmd file (case C):</span>
+<span class="sd">         a. Treat as a one-file project.</span>
+<span class="sd">         b. base_dir = parent directory.</span>
+<span class="sd">         c. project_yaml = None.</span>
+<span class="sd">         d. If user did not supply explicit -f files,</span>
+<span class="sd">            explicit_files = (input_path,), overriding patterns.</span>
+
+<span class="sd">    4. If INPUT_PATH is a YAML file (case D):</span>
+<span class="sd">         a. Treat it as the project’s main YAML.</span>
+<span class="sd">         b. base_dir = parent directory.</span>
+<span class="sd">         c. patterns = file_patterns.</span>
+<span class="sd">         d. explicit_files override as usual.</span>
+
+<span class="sd">    5. Otherwise (case E):</span>
+<span class="sd">         a. Treat INPUT_PATH as a file within a generic folder.</span>
+<span class="sd">         b. base_dir = input_path.parent.</span>
+<span class="sd">         c. project_yaml = None.</span>
+<span class="sd">         d. patterns = file_patterns.</span>
+
+<span class="sd">    6. Return a tuple:</span>
+<span class="sd">         (base_dir, project_yaml, final_patterns, final_explicit_files)</span>
+
+<span class="sd">       Here final_patterns and final_explicit_files encode the correct</span>
+<span class="sd">       forced precedence rules:</span>
+<span class="sd">         - explicit_files always override patterns;</span>
+<span class="sd">         - .qmd input_path without explicit_files forces a single-file</span>
+<span class="sd">           context and ignores patterns;</span>
+<span class="sd">         - YAML always takes precedence for discovery unless overridden.</span>
+
+
+<span class="sd">    RETURNS</span>
+<span class="sd">    -------</span>
+<span class="sd">    (base_dir, project_yaml, patterns, explicit_files) :</span>
+<span class="sd">        base_dir : Path</span>
+<span class="sd">            Directory forming the root of the discovered project.</span>
+
+<span class="sd">        project_yaml : Path | None</span>
+<span class="sd">            The discovered/forced Quarto YAML file, if any.</span>
+
+<span class="sd">        patterns : tuple[str, ...]</span>
+<span class="sd">            Final glob patterns for discovery (possibly empty).</span>
+
+<span class="sd">        explicit_files : tuple[Path, ...]</span>
+<span class="sd">            Final explicit files to include (may be empty).  If non-empty,</span>
+<span class="sd">            discovery must ignore patterns and YAML.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">input_path</span> <span class="o">=</span> <span class="n">input_path</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+
+    <span class="c1"># Case 1: INPUT_PATH is a directory</span>
+    <span class="k">if</span> <span class="n">input_path</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+        <span class="c1"># Check for _quarto.yml/_quarto.yaml directly inside it</span>
+        <span class="n">yaml</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;_quarto.yml&quot;</span><span class="p">,</span> <span class="s2">&quot;_quarto.yaml&quot;</span><span class="p">):</span>
+            <span class="n">cand</span> <span class="o">=</span> <span class="n">input_path</span> <span class="o">/</span> <span class="n">name</span>
+            <span class="k">if</span> <span class="n">cand</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                <span class="n">yaml</span> <span class="o">=</span> <span class="n">cand</span>
+                <span class="k">break</span>
+
+        <span class="n">base_dir</span> <span class="o">=</span> <span class="n">input_path</span>
+        <span class="n">project_yaml</span> <span class="o">=</span> <span class="n">yaml</span>
+        <span class="n">patterns</span> <span class="o">=</span> <span class="n">file_patterns</span>
+        <span class="k">return</span> <span class="n">base_dir</span><span class="p">,</span> <span class="n">project_yaml</span><span class="p">,</span> <span class="n">patterns</span><span class="p">,</span> <span class="n">explicit_files</span>
+
+    <span class="c1"># Case 2: INPUT_PATH is a single .qmd</span>
+    <span class="k">if</span> <span class="n">input_path</span><span class="o">.</span><span class="n">suffix</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;.qmd&quot;</span><span class="p">:</span>
+        <span class="n">base_dir</span> <span class="o">=</span> <span class="n">input_path</span><span class="o">.</span><span class="n">parent</span>
+        <span class="n">project_yaml</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">patterns</span> <span class="o">=</span> <span class="p">()</span>     <span class="c1"># ignore -g unless explicitly desired</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">explicit_files</span><span class="p">:</span>
+            <span class="n">explicit_files</span> <span class="o">=</span> <span class="p">(</span><span class="n">input_path</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">base_dir</span><span class="p">,</span> <span class="n">project_yaml</span><span class="p">,</span> <span class="n">patterns</span><span class="p">,</span> <span class="n">explicit_files</span>
+
+    <span class="c1"># Case 3: INPUT_PATH is a project YAML</span>
+    <span class="k">if</span> <span class="n">input_path</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;_quarto.yml&quot;</span><span class="p">,</span> <span class="s2">&quot;_quarto.yaml&quot;</span><span class="p">):</span>
+        <span class="n">base_dir</span> <span class="o">=</span> <span class="n">input_path</span><span class="o">.</span><span class="n">parent</span>
+        <span class="n">project_yaml</span> <span class="o">=</span> <span class="n">input_path</span>
+        <span class="n">patterns</span> <span class="o">=</span> <span class="n">file_patterns</span>
+        <span class="k">return</span> <span class="n">base_dir</span><span class="p">,</span> <span class="n">project_yaml</span><span class="p">,</span> <span class="n">patterns</span><span class="p">,</span> <span class="n">explicit_files</span>
+
+    <span class="c1"># Otherwise: treat as directory-like root</span>
+    <span class="n">base_dir</span> <span class="o">=</span> <span class="n">input_path</span><span class="o">.</span><span class="n">parent</span>
+    <span class="n">project_yaml</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">patterns</span> <span class="o">=</span> <span class="n">file_patterns</span>
+    <span class="k">return</span> <span class="n">base_dir</span><span class="p">,</span> <span class="n">project_yaml</span><span class="p">,</span> <span class="n">patterns</span><span class="p">,</span> <span class="n">explicit_files</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Stephen J. Mildenhall.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,464 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>quarto_tools.xref &mdash; quarto_tools  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            quarto_tools
+              <img src="../../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">quarto_tools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">quarto_tools.xref</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for quarto_tools.xref</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">discover_quarto_sources</span><span class="p">,</span> <span class="n">extract_front_matter</span><span class="p">,</span>
+                    <span class="n">QUARTO_XREF_PREFIXES</span><span class="p">,</span>
+                    <span class="n">QUARTO_XREF_SUFFIXES</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+<span class="c1"># Keys that look like Quarto-style cross references, based on shared prefixes.</span>
+<span class="n">CROSS_REF_KEY_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+        <span class="sa">r</span><span class="s2">&quot;^(?:&quot;</span> <span class="o">+</span> <span class="n">QUARTO_XREF_PREFIXES</span> <span class="o">+</span> <span class="sa">r</span><span class="s2">&quot;)[&quot;</span> <span class="o">+</span> <span class="n">QUARTO_XREF_SUFFIXES</span> <span class="o">+</span> <span class="sa">r</span><span class="s2">&quot;]&quot;</span>
+        <span class="p">)</span>
+
+
+<div class="viewcode-block" id="_split_prefix">
+<a class="viewcode-back" href="../../api.html#quarto_tools.xref._split_prefix">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">_split_prefix</span><span class="p">(</span><span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the prefix of a label up to the first &#39;-&#39;, &#39;:&#39; or &#39;.&#39;.</span>
+
+<span class="sd">    If none of these separators appear, return the full label.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">sep</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="s2">&quot;.&quot;</span><span class="p">):</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="n">label</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">sep</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">idx</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">label</span><span class="p">[:</span><span class="n">idx</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">label</span></div>
+
+
+
+<div class="viewcode-block" id="_collect_header_context">
+<a class="viewcode-back" href="../../api.html#quarto_tools.xref._collect_header_context">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">_collect_header_context</span><span class="p">(</span><span class="n">lines</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Map each line index to the nearest preceding ATX header text.&quot;&quot;&quot;</span>
+    <span class="n">ctx</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;&quot;</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">]</span>
+    <span class="n">current</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">header_re</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^(?&lt;!#\|)(#{1,}) (.*?)(?:$| (\{.*\})$)&quot;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">lines</span><span class="p">):</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="n">header_re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">m</span><span class="p">:</span>
+            <span class="n">current</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">current</span>
+
+    <span class="k">return</span> <span class="n">ctx</span></div>
+
+
+
+<div class="viewcode-block" id="_scan_file">
+<a class="viewcode-back" href="../../api.html#quarto_tools.xref._scan_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">_scan_file</span><span class="p">(</span>
+    <span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;utf-8&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Scan a single QMD file for label definitions and references.</span>
+
+<span class="sd">    Returns two lists of dicts: (defs_rows, refs_rows).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">text</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">)</span>
+    <span class="n">_title</span><span class="p">,</span> <span class="n">body_lines</span><span class="p">,</span> <span class="n">_meta</span> <span class="o">=</span> <span class="n">extract_front_matter</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+    <span class="n">header_ctx</span> <span class="o">=</span> <span class="n">_collect_header_context</span><span class="p">(</span><span class="n">body_lines</span><span class="p">)</span>
+
+    <span class="n">defs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">refs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Patterns:</span>
+    <span class="c1">#   - inline labels: {#sec-foo}, {... #fig:bar}, etc.</span>
+    <span class="n">inline_label_re</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\{[^}]*?#([A-Za-z0-9:._-]+)[^}]*\}&quot;</span><span class="p">)</span>
+    <span class="c1">#   - chunk labels: #| label: fig-my-figure</span>
+    <span class="n">chunk_label_re</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^#\|\s*label:\s*([A-Za-z0-9:._-]+)\s*$&quot;</span><span class="p">)</span>
+    <span class="c1">#   - references: @sec-foo, @fig:bar, etc.</span>
+    <span class="c1">#     Allow &#39;.&#39; inside but strip trailing &#39;.&#39; that ends a sentence.</span>
+    <span class="n">ref_re</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?&lt;!@)@([A-Za-z0-9_:+./-]+)\b&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Local code-block / HTML-comment toggle, used only for inline labels and refs.</span>
+    <span class="n">incode_rex</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^```|&lt;!\-\-|\-\-&gt;|&lt;!\-\-.*?\-\-&gt;&quot;</span><span class="p">)</span>
+    <span class="n">incode</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">body_lines</span><span class="p">):</span>
+        <span class="n">line_no</span> <span class="o">=</span> <span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">context</span> <span class="o">=</span> <span class="n">header_ctx</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="n">line_stripped</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\r\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Chunk labels  (these live inside code blocks, so we always check them)</span>
+        <span class="n">m_chunk</span> <span class="o">=</span> <span class="n">chunk_label_re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line_stripped</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">m_chunk</span><span class="p">:</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="n">m_chunk</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="n">prefix</span> <span class="o">=</span> <span class="n">_split_prefix</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+            <span class="n">defs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;file&quot;</span><span class="p">:</span> <span class="n">path</span><span class="p">,</span>
+                    <span class="s2">&quot;line_no&quot;</span><span class="p">:</span> <span class="n">line_no</span><span class="p">,</span>
+                    <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="n">label</span><span class="p">,</span>
+                    <span class="s2">&quot;prefix&quot;</span><span class="p">:</span> <span class="n">prefix</span><span class="p">,</span>
+                    <span class="s2">&quot;kind&quot;</span><span class="p">:</span> <span class="s2">&quot;chunk&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;header&quot;</span><span class="p">:</span> <span class="n">context</span><span class="p">,</span>
+                    <span class="s2">&quot;text&quot;</span><span class="p">:</span> <span class="n">line_stripped</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Toggle code / HTML comment state based on markers on this line.</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">incode_rex</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">line_stripped</span><span class="p">):</span>
+            <span class="n">incode</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">incode</span>
+
+        <span class="c1"># Inside code: skip inline labels and refs, but we already captured chunk labels.</span>
+        <span class="k">if</span> <span class="n">incode</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="c1"># Inline labels (may be on header or normal text)</span>
+        <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">inline_label_re</span><span class="o">.</span><span class="n">finditer</span><span class="p">(</span><span class="n">line_stripped</span><span class="p">):</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="n">prefix</span> <span class="o">=</span> <span class="n">_split_prefix</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+            <span class="n">defs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;file&quot;</span><span class="p">:</span> <span class="n">path</span><span class="p">,</span>
+                    <span class="s2">&quot;line_no&quot;</span><span class="p">:</span> <span class="n">line_no</span><span class="p">,</span>
+                    <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="n">label</span><span class="p">,</span>
+                    <span class="s2">&quot;prefix&quot;</span><span class="p">:</span> <span class="n">prefix</span><span class="p">,</span>
+                    <span class="s2">&quot;kind&quot;</span><span class="p">:</span> <span class="s2">&quot;inline&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;header&quot;</span><span class="p">:</span> <span class="n">context</span><span class="p">,</span>
+                    <span class="s2">&quot;text&quot;</span><span class="p">:</span> <span class="n">line_stripped</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+        <span class="c1"># References</span>
+        <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">ref_re</span><span class="o">.</span><span class="n">finditer</span><span class="p">(</span><span class="n">line_stripped</span><span class="p">):</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">label</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">xref</span> <span class="o">=</span> <span class="n">CROSS_REF_KEY_RE</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">label</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">xref</span><span class="p">:</span>
+                <span class="c1"># no match -&gt; these are bibtex references</span>
+                <span class="k">continue</span>
+            <span class="n">prefix</span> <span class="o">=</span> <span class="n">_split_prefix</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+            <span class="n">refs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;file&quot;</span><span class="p">:</span> <span class="n">path</span><span class="p">,</span>
+                    <span class="s2">&quot;line_no&quot;</span><span class="p">:</span> <span class="n">line_no</span><span class="p">,</span>
+                    <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="n">label</span><span class="p">,</span>
+                    <span class="s2">&quot;prefix&quot;</span><span class="p">:</span> <span class="n">prefix</span><span class="p">,</span>
+                    <span class="s2">&quot;xref&quot;</span><span class="p">:</span> <span class="n">xref</span><span class="p">,</span>
+                    <span class="s2">&quot;header&quot;</span><span class="p">:</span> <span class="n">context</span><span class="p">,</span>
+                    <span class="s2">&quot;text&quot;</span><span class="p">:</span> <span class="n">line_stripped</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">defs</span><span class="p">,</span> <span class="n">refs</span></div>
+
+
+
+<div class="viewcode-block" id="validate_quarto_labels">
+<a class="viewcode-back" href="../../api.html#quarto_tools.xref.validate_quarto_labels">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_quarto_labels</span><span class="p">(</span>
+    <span class="n">defs_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span>
+    <span class="n">refs_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span>
+    <span class="n">allowed_prefixes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate label definitions and references.</span>
+
+<span class="sd">    Returns a dictionary with:</span>
+<span class="sd">      - ok: bool</span>
+<span class="sd">      - duplicate_labels_df: duplicated label definitions</span>
+<span class="sd">      - undefined_refs_df: references without a matching definition</span>
+<span class="sd">      - unused_defs_df: definitions never referenced</span>
+<span class="sd">      - prefix_stats_df: counts of prefixes and allowed/unknown flag</span>
+<span class="sd">      - summary_df: high-level summary of counts</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">defs_df</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="n">refs_df</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+        <span class="n">summary_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="p">{</span><span class="s2">&quot;issue&quot;</span><span class="p">:</span> <span class="s2">&quot;definitions&quot;</span><span class="p">,</span> <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+                <span class="p">{</span><span class="s2">&quot;issue&quot;</span><span class="p">:</span> <span class="s2">&quot;references&quot;</span><span class="p">,</span> <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">},</span>
+            <span class="p">]</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;ok&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s2">&quot;duplicate_labels_df&quot;</span><span class="p">:</span> <span class="n">defs_df</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+            <span class="s2">&quot;undefined_refs_df&quot;</span><span class="p">:</span> <span class="n">refs_df</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+            <span class="s2">&quot;unused_defs_df&quot;</span><span class="p">:</span> <span class="n">defs_df</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+            <span class="s2">&quot;prefix_stats_df&quot;</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+                <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;prefix&quot;</span><span class="p">,</span> <span class="s2">&quot;def_count&quot;</span><span class="p">,</span> <span class="s2">&quot;ref_count&quot;</span><span class="p">,</span> <span class="s2">&quot;allowed&quot;</span><span class="p">]</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;summary_df&quot;</span><span class="p">:</span> <span class="n">summary_df</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="c1"># Normalize label and prefix columns</span>
+    <span class="n">defs_df</span> <span class="o">=</span> <span class="n">defs_df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">refs_df</span> <span class="o">=</span> <span class="n">refs_df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="k">if</span> <span class="s2">&quot;label&quot;</span> <span class="ow">in</span> <span class="n">defs_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">defs_df</span><span class="p">[</span><span class="s2">&quot;label&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">defs_df</span><span class="p">[</span><span class="s2">&quot;label&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="s2">&quot;label&quot;</span> <span class="ow">in</span> <span class="n">refs_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">refs_df</span><span class="p">[</span><span class="s2">&quot;label&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">refs_df</span><span class="p">[</span><span class="s2">&quot;label&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="s2">&quot;prefix&quot;</span> <span class="ow">in</span> <span class="n">defs_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">defs_df</span><span class="p">[</span><span class="s2">&quot;prefix&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">defs_df</span><span class="p">[</span><span class="s2">&quot;prefix&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="s2">&quot;prefix&quot;</span> <span class="ow">in</span> <span class="n">refs_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">refs_df</span><span class="p">[</span><span class="s2">&quot;prefix&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">refs_df</span><span class="p">[</span><span class="s2">&quot;prefix&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+    <span class="c1"># Duplicate label definitions</span>
+    <span class="n">dup_mask</span> <span class="o">=</span> <span class="n">defs_df</span><span class="o">.</span><span class="n">duplicated</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;label&quot;</span><span class="p">],</span> <span class="n">keep</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">duplicate_labels_df</span> <span class="o">=</span> <span class="n">defs_df</span><span class="p">[</span><span class="n">dup_mask</span><span class="p">]</span><span class="o">.</span><span class="n">sort_values</span><span class="p">([</span><span class="s2">&quot;label&quot;</span><span class="p">,</span> <span class="s2">&quot;file&quot;</span><span class="p">,</span> <span class="s2">&quot;line_no&quot;</span><span class="p">])</span>
+
+    <span class="c1"># Undefined references</span>
+    <span class="n">defined_labels</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">defs_df</span><span class="p">[</span><span class="s2">&quot;label&quot;</span><span class="p">])</span>
+    <span class="n">undefined_refs_df</span> <span class="o">=</span> <span class="n">refs_df</span><span class="p">[</span><span class="o">~</span><span class="n">refs_df</span><span class="p">[</span><span class="s2">&quot;label&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">defined_labels</span><span class="p">)]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">undefined_refs_df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">([</span><span class="s2">&quot;label&quot;</span><span class="p">,</span> <span class="s2">&quot;file&quot;</span><span class="p">,</span> <span class="s2">&quot;line_no&quot;</span><span class="p">],</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Unused definitions</span>
+    <span class="n">referenced_labels</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">refs_df</span><span class="p">[</span><span class="s2">&quot;label&quot;</span><span class="p">])</span>
+    <span class="n">unused_defs_df</span> <span class="o">=</span> <span class="n">defs_df</span><span class="p">[</span><span class="o">~</span><span class="n">defs_df</span><span class="p">[</span><span class="s2">&quot;label&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">referenced_labels</span><span class="p">)]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">unused_defs_df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">([</span><span class="s2">&quot;label&quot;</span><span class="p">,</span> <span class="s2">&quot;file&quot;</span><span class="p">,</span> <span class="s2">&quot;line_no&quot;</span><span class="p">],</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Prefix statistics</span>
+    <span class="n">def_counts</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">defs_df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;prefix&quot;</span><span class="p">,</span> <span class="n">dropna</span><span class="o">=</span><span class="kc">False</span><span class="p">)[</span><span class="s2">&quot;label&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">count</span><span class="p">()</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="s2">&quot;def_count&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">ref_counts</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">refs_df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;prefix&quot;</span><span class="p">,</span> <span class="n">dropna</span><span class="o">=</span><span class="kc">False</span><span class="p">)[</span><span class="s2">&quot;label&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">count</span><span class="p">()</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="s2">&quot;ref_count&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">prefix_stats_df</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">def_counts</span><span class="p">,</span> <span class="n">ref_counts</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+        <span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="s2">&quot;prefix&quot;</span><span class="p">})</span>
+    <span class="p">)</span>
+    <span class="n">prefix_stats_df</span><span class="p">[</span><span class="s2">&quot;prefix&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">prefix_stats_df</span><span class="p">[</span><span class="s2">&quot;prefix&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">allowed_prefixes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">allowed_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">allowed_prefixes</span><span class="p">)</span>
+        <span class="n">prefix_stats_df</span><span class="p">[</span><span class="s2">&quot;allowed&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">prefix_stats_df</span><span class="p">[</span><span class="s2">&quot;prefix&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">allowed_set</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">prefix_stats_df</span><span class="p">[</span><span class="s2">&quot;allowed&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">NA</span>
+
+    <span class="c1"># Summary</span>
+    <span class="n">summary_rows</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">{</span><span class="s2">&quot;issue&quot;</span><span class="p">:</span> <span class="s2">&quot;definitions&quot;</span><span class="p">,</span> <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">defs_df</span><span class="p">))},</span>
+        <span class="p">{</span><span class="s2">&quot;issue&quot;</span><span class="p">:</span> <span class="s2">&quot;references&quot;</span><span class="p">,</span> <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">refs_df</span><span class="p">))},</span>
+        <span class="p">{</span><span class="s2">&quot;issue&quot;</span><span class="p">:</span> <span class="s2">&quot;duplicate_labels&quot;</span><span class="p">,</span> <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">duplicate_labels_df</span><span class="p">))},</span>
+        <span class="p">{</span><span class="s2">&quot;issue&quot;</span><span class="p">:</span> <span class="s2">&quot;undefined_refs&quot;</span><span class="p">,</span> <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">undefined_refs_df</span><span class="p">))},</span>
+        <span class="p">{</span><span class="s2">&quot;issue&quot;</span><span class="p">:</span> <span class="s2">&quot;unused_defs&quot;</span><span class="p">,</span> <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">unused_defs_df</span><span class="p">))},</span>
+    <span class="p">]</span>
+    <span class="k">if</span> <span class="n">allowed_prefixes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">bad_prefixes</span> <span class="o">=</span> <span class="n">prefix_stats_df</span><span class="p">[</span>
+            <span class="n">prefix_stats_df</span><span class="p">[</span><span class="s2">&quot;allowed&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="kc">False</span>  <span class="c1"># noqa: E712</span>
+        <span class="p">]</span>
+        <span class="n">summary_rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="p">{</span><span class="s2">&quot;issue&quot;</span><span class="p">:</span> <span class="s2">&quot;bad_prefixes&quot;</span><span class="p">,</span> <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bad_prefixes</span><span class="p">))}</span>
+        <span class="p">)</span>
+
+    <span class="n">summary_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">summary_rows</span><span class="p">)</span>
+
+    <span class="n">ok</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">duplicate_labels_df</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span>
+        <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">undefined_refs_df</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span>
+        <span class="ow">and</span> <span class="p">(</span>
+            <span class="n">allowed_prefixes</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="ow">or</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">prefix_stats_df</span><span class="p">[</span><span class="s2">&quot;allowed&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="kc">False</span><span class="p">)</span>  <span class="c1"># noqa: E712</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;ok&quot;</span><span class="p">:</span> <span class="n">ok</span><span class="p">,</span>
+        <span class="s2">&quot;duplicate_labels_df&quot;</span><span class="p">:</span> <span class="n">duplicate_labels_df</span><span class="p">,</span>
+        <span class="s2">&quot;undefined_refs_df&quot;</span><span class="p">:</span> <span class="n">undefined_refs_df</span><span class="p">,</span>
+        <span class="s2">&quot;unused_defs_df&quot;</span><span class="p">:</span> <span class="n">unused_defs_df</span><span class="p">,</span>
+        <span class="s2">&quot;prefix_stats_df&quot;</span><span class="p">:</span> <span class="n">prefix_stats_df</span><span class="p">,</span>
+        <span class="s2">&quot;summary_df&quot;</span><span class="p">:</span> <span class="n">summary_df</span><span class="p">,</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="QuartoXRefs">
+<a class="viewcode-back" href="../../api.html#quarto_tools.xref.QuartoXRefs">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">QuartoXRefs</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Scan a Quarto project for label definitions and references.</span>
+
+<span class="sd">    This class discovers .qmd sources using the same logic as QuartoToc,</span>
+<span class="sd">    extracts label definitions and references, and provides basic validation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">base_dir</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">project_yaml</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">file_patterns</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">explicit_files</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;utf-8&quot;</span>
+    <span class="n">allowed_prefixes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">QUARTO_XREF_PREFIXES</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;|&quot;</span><span class="p">))</span>
+
+    <span class="n">defs_df</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">refs_df</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<div class="viewcode-block" id="QuartoXRefs._discover_sources">
+<a class="viewcode-back" href="../../api.html#quarto_tools.xref.QuartoXRefs._discover_sources">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_discover_sources</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Discover .qmd sources using quarto_tools.utils.&quot;&quot;&quot;</span>
+        <span class="n">sources</span><span class="p">,</span> <span class="n">_project_title</span> <span class="o">=</span> <span class="n">discover_quarto_sources</span><span class="p">(</span>
+            <span class="n">base_dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">,</span>
+            <span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">,</span>
+            <span class="n">project_yaml</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project_yaml</span><span class="p">,</span>
+            <span class="n">file_patterns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">file_patterns</span><span class="p">,</span>
+            <span class="n">explicit_files</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">explicit_files</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">sources</span></div>
+
+
+<div class="viewcode-block" id="QuartoXRefs.scan">
+<a class="viewcode-back" href="../../api.html#quarto_tools.xref.QuartoXRefs.scan">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">scan</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Scan project sources and populate defs_df and refs_df.&quot;&quot;&quot;</span>
+        <span class="n">sources</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_discover_sources</span><span class="p">()</span>
+
+        <span class="n">all_defs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">all_refs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">sources</span><span class="p">:</span>
+            <span class="n">defs_rows</span><span class="p">,</span> <span class="n">refs_rows</span> <span class="o">=</span> <span class="n">_scan_file</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">)</span>
+            <span class="n">all_defs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">defs_rows</span><span class="p">)</span>
+            <span class="n">all_refs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">refs_rows</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">defs_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">all_defs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">refs_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">all_refs</span><span class="p">)</span>
+
+        <span class="c1"># Make file paths relative to base_dir to keep tables narrow and readable.</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">defs_df</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="s2">&quot;file&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">defs_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">defs_df</span><span class="p">[</span><span class="s2">&quot;file&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">defs_df</span><span class="p">[</span><span class="s2">&quot;file&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span>
+                <span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">Path</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">p</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span> <span class="ow">in</span> <span class="n">p</span><span class="o">.</span><span class="n">parents</span><span class="p">)</span>
+                <span class="k">else</span> <span class="n">p</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">refs_df</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="s2">&quot;file&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">refs_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">refs_df</span><span class="p">[</span><span class="s2">&quot;file&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">refs_df</span><span class="p">[</span><span class="s2">&quot;file&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span>
+                <span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="n">p</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">Path</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">p</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_dir</span> <span class="ow">in</span> <span class="n">p</span><span class="o">.</span><span class="n">parents</span><span class="p">)</span>
+                <span class="k">else</span> <span class="n">p</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">defs_df</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">refs_df</span></div>
+
+
+<div class="viewcode-block" id="QuartoXRefs.validate">
+<a class="viewcode-back" href="../../api.html#quarto_tools.xref.QuartoXRefs.validate">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate labels and references, returning a summary dictionary.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">defs_df</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">refs_df</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">scan</span><span class="p">()</span>
+
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">defs_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">refs_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="n">validate_quarto_labels</span><span class="p">(</span>
+            <span class="n">defs_df</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">defs_df</span><span class="p">,</span>
+            <span class="n">refs_df</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">refs_df</span><span class="p">,</span>
+            <span class="n">allowed_prefixes</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">allowed_prefixes</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Stephen J. Mildenhall.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

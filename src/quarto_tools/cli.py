@@ -3,8 +3,16 @@ quarto_tools command line interface.
 """
 
 from pathlib import Path
+import subprocess
+import os
+import shlex
+import subprocess
 
 import click
+from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import FuzzyCompleter, NestedCompleter, PathCompleter
+from prompt_toolkit.formatted_text import HTML
+import pandas as pd
 from greater_tables import GT
 
 from .utils import resolve_quarto_context
@@ -13,14 +21,54 @@ from .bibtex import QuartoBibTex, parse_bibtex_text
 from .xref import QuartoXRefs
 from .tidy import QuartoTidy
 from .pytest_qmd import QuartoPyTest
+from .consolidate import QuartoConsolidate
 
 
+# helpers ===================================================================
+# this should be in utils?
 def qd(df, **kwargs):
     """click enabled suitable quick display method."""
     kwargs = {'show_index': False} | kwargs
     click.echo(GT(df, **kwargs))
 
 
+def _run_qt_line(ctx: click.Context, line: str, debug: bool = False, prog_name: str = "qt uber") -> None:
+    """
+    Parse a single qt command line and dispatch it through the main click group.
+
+    Empty lines and comment-only lines (starting with '#') are ignored.
+    Any click.SystemExit exceptions are caught so one bad command does not
+    terminate an uber or script session.
+    """
+    line = line.strip()
+    if not line:
+        return
+    if line.startswith("#"):
+        return
+
+    try:
+        args = shlex.split(line)
+    except ValueError as exc:
+        click.echo(f"Could not parse line: {line!r} ({exc})")
+        return
+
+    if not args:
+        return
+
+    if debug:
+        click.echo(f"Executing: {args}")
+
+    try:
+        # entry is your main click group
+        entry.main(args=args, prog_name=prog_name, obj=ctx)
+    except SystemExit:
+        # swallow click's SystemExit so the REPL/script keeps running
+        if debug:
+            click.echo("Command raised SystemExit (ignored).")
+
+
+
+# main entry point ==========================================================
 @click.group()
 def entry():
     """CLI for quarto_tools."""
@@ -90,10 +138,10 @@ def entry():
     help="Subcolumn packing strategy.",
 )
 @click.option(
-    "-p", "--promote-chapter",
+    "-n", "--chapter-number",
     type=int,
     default=-1,
-    help="Promote chapter to book, more detailed toc for individual chapter; default -1 no promotion.",
+    help="TOC for chapter number only (promote chapter to book), more detailed toc for individual chapter; default -1 use whole book.",
 )
 @click.option(
     "-o", "--omit",
@@ -105,6 +153,24 @@ def entry():
     "file_patterns",
     multiple=True,
     help="Glob pattern(s) for QMD files relative to INPUT_PATH when it is a directory, like ripgrep -g, can be given multiple times.",
+)
+@click.option(
+    "-x", "--execute/--no-execute",
+    default=False,
+    show_default=True,
+    help="Execute LaTeX command to build pdf. Default is no execution.",
+)
+@click.option(
+    "--messy/--tidy",
+    default=False,
+    show_default=True,
+    help="Do not tidy up log and aux files after TeX build. Default is not to be messy.",
+)
+@click.option(
+    "-s", "--svg/--no-svg",
+    default=False,
+    show_default=True,
+    help="If execute, then also create svg file from PDF. Default is no svg.",
 )
 @click.option(
     "-d", "--debug/--no-debug",
@@ -123,9 +189,12 @@ def toc(
     max_levels: int,
     up_level: bool,
     balance_mode: str,
-    promote_chapter: int,
+    chapter_number: int,
     omit: tuple[str],
     file_patterns: tuple[str, ...],
+    execute: bool,
+    messy: bool,
+    svg: bool,
     debug: bool,
 ) -> None:
     """
@@ -145,25 +214,6 @@ def toc(
         file_patterns=file_patterns,
     )
 
-    # if input_path.is_dir():
-    #     base_dir = input_path
-    #     project_yaml: Path | None = None
-    #     patterns = file_patterns
-    # else:
-    #     suffix = input_path.suffix.lower()
-    #     if suffix == ".qmd":
-    #         base_dir = input_path.parent
-    #         project_yaml = None
-    #         patterns = ()
-    #         # if no -f/--file given, treat INPUT_PATH as the single explicit file
-    #         if not explicit_files:
-    #             explicit_files = (input_path,)
-    #     else:
-    #         # treat as explicit project YAML (_quarto.yml / _quarto.yaml)
-    #         base_dir = input_path.parent
-    #         project_yaml = input_path
-    #         patterns = file_patterns
-
     toc = QuartoToc(
         base_dir=base_dir,
         project_yaml=project_yaml,
@@ -176,15 +226,38 @@ def toc(
         max_levels=max_levels,
         up_level=up_level,
         balance_mode=balance_mode,
-        promote_chapter=promote_chapter,
         omit_titles=set(omit) if omit else None,
         debug=debug,
     )
 
-    toc.write_tex(output_file, promote_chapter)
-
+    toc.write_tex(output_file, chapter_number)
     click.echo(f"Wrote {output_file}")
 
+    if execute:
+        result = toc.run_lualatex(output_file)
+        if result.returncode == 0:
+            click.echo('Built TeX file to PDF')
+        else:
+            click.echo(f"Error: lualatex failed with return code {result.returncode}")
+            click.echo("Captured stderr:")
+            click.echo(result.stderr)
+        if not messy:
+            for ext in ('.aux', '.log'):
+                f = output_file.with_suffix(ext)
+                if f.exists(): f.unlink()
+    if execute and svg and (pdf_file := output_file.with_suffix('.pdf')).exists():
+        svg_file = output_file.with_suffix('.svg')
+        result = subprocess.run(
+            ["pdf2svg", str(pdf_file), str(svg_file)],
+            check=False,  # does not raise an error
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,   # separate error from stdout
+            text=True,
+        )
+        if result.returncode != 0:
+            click.echo(f"Error: pdf2svg failed with return code {result.returncode}")
+            click.echo("Captured stderr:")
+            click.echo(result.stderr)
 
 # bibtex  ====================================================
 # bibtex: citations and references ===========================================
@@ -551,7 +624,7 @@ def tidy():
     pass
 
 
-@tidy.command("one-file")
+@tidy.command("flatten-file")
 @click.argument(
     "input_file",
     type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
@@ -670,25 +743,6 @@ def tidy_format(
         explicit_files=explicit_files,
         file_patterns=file_patterns,
     )
-
-    # if input_path.is_dir():
-    #     base_dir = input_path
-    #     project_yaml: Path | None = None
-    #     patterns = file_patterns
-    # else:
-    #     suffix = input_path.suffix.lower()
-    #     if suffix == ".qmd":
-    #         base_dir = input_path.parent
-    #         project_yaml = None
-    #         patterns = ()
-    #         # if no -f/--file given, treat INPUT_PATH as the single explicit file
-    #         if not explicit_files:
-    #             explicit_files = (input_path,)
-    #     else:
-    #         # treat as explicit project YAML (_quarto.yml / _quarto.yaml)
-    #         base_dir = input_path.parent
-    #         project_yaml = input_path
-    #         patterns = file_patterns
 
     qt = QuartoTidy(
         base_dir=base_dir,
@@ -876,6 +930,68 @@ def tidy_report(
         click.echo(f"  files with blocks: {num_files}")
         click.echo(f"  total blocks     : {num_blocks}")
 
+
+# consolidate: single-file book ================================================
+@entry.command()
+@click.argument(
+    "input_path",
+    type=click.Path(exists=True, file_okay=True, dir_okay=True, path_type=Path),
+)
+@click.argument(
+    "output_file",
+    type=click.Path(dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--comment-front-matter/--strip-front-matter",
+    default=False,
+    show_default=True,
+    help="Preserve per-file YAML front matter as commented blocks.",
+)
+@click.option(
+    "--heading-level",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Heading level for chapter titles extracted from front matter.",
+)
+def consolidate(
+    input_path: Path,
+    output_file: Path,
+    comment_front_matter: bool,
+    heading_level: int,
+) -> None:
+    """
+    Consolidate a Quarto project into a single .qmd file.
+
+    INPUT_PATH may be:
+
+    \\b
+    - a Quarto project directory (with _quarto.yml / _quarto.yaml),
+    - a single .qmd file,
+    - a _quarto.yml / _quarto.yaml file.
+
+    The output is a monolithic .qmd that flattens {{< include >}} directives
+    and inserts chapter headings from per-file 'title:' front matter.
+    """
+    base_dir, project_yaml, patterns, explicit_files = resolve_quarto_context(
+        input_path=input_path,
+        explicit_files=(),
+        file_patterns=(),
+    )
+
+    qc = QuartoConsolidate(
+        base_dir=base_dir,
+        project_yaml=project_yaml,
+        file_patterns=patterns,
+        explicit_files=explicit_files,
+        encoding="utf-8",
+    )
+    qc.consolidate(
+        output_path=output_file,
+        comment_front_matter=comment_front_matter,
+        heading_level=heading_level,
+    )
+    click.echo(f"Wrote consolidated file to {output_file}")
 
 
 # pytesting ====================================================
@@ -1153,3 +1269,149 @@ def qpytest_run_parallel(
             click.echo(
                 f"  {row['file']} [block {row['block_index']}] {label}"
             )
+
+
+# uber  ====================================================
+@entry.command()
+@click.pass_context
+@click.option(
+    "-p",
+    "--prompt-label",
+    type=str,
+    default="qt uber",
+    show_default=True,
+    help="Label shown in the uber prompt.",
+)
+@click.option(
+    "-d",
+    "--debug",
+    is_flag=True,
+    help="Print parsed commands before executing them.",
+)
+def uber(ctx: click.Context, prompt_label: str, debug: bool) -> None:
+    """
+    Interactive shell for quarto_tools.
+
+    Loads the library once, then lets you run qt subcommands repeatedly with
+    completion and history. Type 'q' or 'exit' to leave.
+    """
+    # Build command list from registered subcommands plus a few shell helpers.
+    qt_commands = sorted(entry.commands.keys())
+    special = ["cd", "pwd", "dir", "cls", "q", "x", "e", "ex", "ev", "quit", "exit", "help", "h", "?"]
+
+    dcommands: dict[str, object] = {name: None for name in qt_commands + special}
+    # Use a PathCompleter specifically for cd
+    dcommands["cd"] = PathCompleter(only_directories=True, expanduser=True)
+
+    completer = FuzzyCompleter(NestedCompleter(dcommands))
+    session = PromptSession(completer=completer)
+
+    def _prompt() -> str:
+        cwd = os.getcwd()
+        # HTML lets us color the label a bit if you like
+        return HTML(f"<ansired>{prompt_label} > </ansired>")
+        # return HTML(f"<ansigreeen>{cwd}</ansigreeen> <ansired>{prompt_label} > </ansired>")
+
+    while True:
+        try:
+            q = session.prompt(_prompt()).strip()
+
+            if not q:
+                continue
+
+            if q in {"q", "x", "quit", "exit", ".."}:
+                break
+            if q in {"h", "?", "help"}:
+                click.echo("Type a qt sub-command (e.g. 'toc', 'tidy', 'xref') or 'q' to quit.\n"
+                    "Use --help to access CLI built-in help.")
+                continue
+            if q == "cls":
+                os.system("cls")
+                continue
+            if q in {"pwd", "cwd"}:
+                click.echo(os.getcwd())
+                continue
+            if q in {'e', 'ex'}:
+                # windows explorer; not Popen is async run
+                subprocess.Popen(["explorer", os.getcwd()])
+            if q == "ev":
+                # everything
+                subprocess.Popen(["C:\\Program Files\\Everything\\Everything.exe", "-search", f"path:{os.getcwd()}"])
+            if q.startswith("cd "):
+                path = q[3:].strip()
+                if path:
+                    try:
+                        os.chdir(path)
+                    except FileNotFoundError:
+                        click.echo(f"Directory not found: {path}")
+                continue
+            if q.startswith("dir") or q.startswith("type "):
+                # pass dir and its arguments to cmd
+                result = subprocess.run(q, shell=True, text=True, capture_output=True)
+                if result.stdout:
+                    click.echo(result.stdout.rstrip("\n"))
+                if result.stderr:
+                    click.echo(result.stderr.rstrip("\n"))
+                continue
+
+            # Delegate everything else to the main qt entry point
+            _run_qt_line(ctx=ctx, line=q, debug=debug, prog_name="qt uber")
+
+        except KeyboardInterrupt:
+            # Ctrl+C: just move to a new prompt
+            continue
+        except EOFError:
+            # Ctrl+D: exit the shell
+            break
+
+
+# scripting  ====================================================
+@entry.command()
+@click.pass_context
+@click.argument(
+    "script_file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "-d",
+    "--debug",
+    is_flag=True,
+    help="Print parsed commands before executing them.",
+)
+def script(ctx: click.Context, script_file: Path, debug: bool) -> None:
+    """
+    Run a series of qt commands from SCRIPT_FILE.
+
+    Lines ending with a backslash '\\' are continued on the next line
+    (Python-style). Empty lines and lines starting with '#' are ignored.
+    """
+    text = script_file.read_text(encoding="utf-8")
+    lines = text.splitlines()
+
+    buffer: list[str] = []
+
+    def flush() -> None:
+        if not buffer:
+            return
+        logical = " ".join(buffer).strip()
+        buffer.clear()
+        if logical:
+            _run_qt_line(ctx=ctx, line=logical, debug=debug, prog_name="qt script")
+
+    for raw in lines:
+        line = raw.rstrip()
+        if not line:
+            # blank line ends any current command
+            flush()
+            continue
+
+        if line.endswith("\\"):
+            # continuation: drop trailing backslash and keep accumulating
+            buffer.append(line[:-1].rstrip())
+            continue
+
+        buffer.append(line)
+        flush()
+
+    # leftover command without trailing newline
+    flush()
