@@ -533,90 +533,6 @@ def xrefs(
         raise SystemExit(1)
 
 
-# @entry.command()
-# @click.argument(
-#     "project_root",
-#     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-# )
-# @click.option(
-#     "-w", "--write-csv",
-#     is_flag=True,
-#     help="Write defs/refs CSV files alongside the project root.",
-# )
-# @click.option(
-#     "-o","--out-prefix",
-#     type=str,
-#     default="quarto_xrefs",
-#     show_default=True,
-#     help="Filename prefix for CSV outputs (without extension).",
-# )
-# @click.option(
-#     "-f","--fail-on-error",
-#     is_flag=True,
-#     default=False,
-#     help="Exit with non-zero status if issues are found.",
-# )
-# def xrefs(project_root, write_csv, out_prefix, fail_on_error):
-#     """
-#     Scan a Quarto project for label definitions and references and report issues.
-#     """
-#     xr = QuartoXRefs(base_dir=project_root)
-#     defs_df, refs_df = xr.scan()
-#     results = xr.validate()
-
-#     summary_df = results["summary_df"]
-
-#     # output results
-#     ff = lambda x: f'{int(x):d}'
-#     # for k, v in results.items():
-#     for k in ['summary_df', 'duplicate_labels_df', 'undefined_refs_df']:
-#         v = results[k]
-#         try:
-#             print(k)
-#             print('=' * len(k))
-#             print()
-#             print(GT(v, large_ok=True, formatters={
-#                 'def_count': ff,
-#                 'ref_count': ff,
-#                 'xref': ff,
-#                 # actually boolean
-#                 "allowed": lambda x: 'Yes' if x else 'No'
-#                  },
-#                  max_table_inch_width=12,
-#                  show_index=False))
-#             print()
-#         except:
-#             print(f'ISSUE with {k}')
-#             print(v)
-
-#     if write_csv:
-
-#         # write in calling dir for now
-#         project_root = Path('.')
-
-#         defs_path = project_root / f"{out_prefix}_defs.csv"
-#         refs_path = project_root / f"{out_prefix}_refs.csv"
-#         results["duplicate_labels_df"].to_csv(
-#             project_root / f"{out_prefix}_duplicate_labels.csv",
-#             index=False,
-#         )
-#         results["undefined_refs_df"].to_csv(
-#             project_root / f"{out_prefix}_undefined_refs.csv",
-#             index=False,
-#         )
-#         results["unused_defs_df"].to_csv(
-#             project_root / f"{out_prefix}_unused_defs.csv",
-#             index=False,
-#         )
-#         defs_df.to_csv(defs_path, index=False)
-#         refs_df.to_csv(refs_path, index=False)
-#         click.echo(f"Wrote defs to {defs_path}")
-#         click.echo(f"Wrote refs to {refs_path}")
-
-#     if fail_on_error and not results["ok"]:
-#         raise SystemExit(1)
-
-
 # tidying ====================================================
 @entry.group()
 def tidy():
@@ -1290,27 +1206,34 @@ def qpytest_run_parallel(
 )
 def uber(ctx: click.Context, prompt_label: str, debug: bool) -> None:
     """
-    Interactive shell for quarto_tools.
+        Interactive shell for quarto_tools.
 
-    Loads the library once, then lets you run qt subcommands repeatedly with
-    completion and history. Type 'q' or 'exit' to leave.
-    """
-    # Build command list from registered subcommands plus a few shell helpers.
+        Loads the library once, then lets you run qt subcommands repeatedly with
+        completion and history. Type 'q' or 'exit' to leave.
+        """
+    # 1. Build list of *your* app's commands
     qt_commands = sorted(entry.commands.keys())
-    special = ["cd", "pwd", "dir", "cls", "q", "x", "e", "ex", "ev", "quit", "exit", "help", "h", "?"]
+    help_string =(
+        "Type a qt sub-command, a shell command (e.g. 'dir', 'tree'), or 'q' to quit.\n"
+        "Use --help to access CLI built-in help. Known commands are:\n\t" +
+        '\n\t'.join(qt_commands)
+    )
+    if debug:
+        click.echo(help_string)
 
-    dcommands: dict[str, object] = {name: None for name in qt_commands + special}
-    # Use a PathCompleter specifically for cd
+    # 2. Build list of REPL built-in commands
+    repl_builtins = ["cd", "pwd", "cls", "q", "x", "quit", "exit", "help", "ev", "h", "?"]
+
+    # 3. Setup completer
+    dcommands: dict[str, object] = {name: None for name in qt_commands + repl_builtins}
     dcommands["cd"] = PathCompleter(only_directories=True, expanduser=True)
-
     completer = FuzzyCompleter(NestedCompleter(dcommands))
     session = PromptSession(completer=completer)
 
     def _prompt() -> str:
-        cwd = os.getcwd()
-        # HTML lets us color the label a bit if you like
-        return HTML(f"<ansired>{prompt_label} > </ansired>")
-        # return HTML(f"<ansigreeen>{cwd}</ansigreeen> <ansired>{prompt_label} > </ansired>")
+        # cwd = Path.cwd()
+        # return HTML(f"<ansigreen>{cwd}</ansigreen> <ansired> {prompt_label} > </ansired>")
+        return HTML(f"<ansired> {prompt_label} > </ansired>")
 
     while True:
         try:
@@ -1319,43 +1242,66 @@ def uber(ctx: click.Context, prompt_label: str, debug: bool) -> None:
             if not q:
                 continue
 
+            # --- 1. Handle REPL exit commands ---
             if q in {"q", "x", "quit", "exit", ".."}:
                 break
+
+            # --- 2. Handle REPL built-in commands ---
             if q in {"h", "?", "help"}:
-                click.echo("Type a qt sub-command (e.g. 'toc', 'tidy', 'xref') or 'q' to quit.\n"
-                    "Use --help to access CLI built-in help.")
+                click.echo(help_string)
                 continue
+
             if q == "cls":
                 os.system("cls")
                 continue
-            if q in {"pwd", "cwd"}:
-                click.echo(os.getcwd())
+
+            if q in {"pwd", "cwd", "cd"}:
+                click.echo(Path.cwd())
                 continue
-            if q in {'e', 'ex'}:
-                # windows explorer; not Popen is async run
-                subprocess.Popen(["explorer", os.getcwd()])
+
+            if q.startswith("cd "):
+                path_str = q[3:].strip()
+                if path_str:
+                    try:
+                        p = Path(path_str).expanduser()
+                        os.chdir(p)  # This must be os.chdir to affect the parent process
+                    except FileNotFoundError:
+                        click.echo(f"Directory not found: {p}", err=True)
+                    except NotADirectoryError:
+                         click.echo(f"Not a directory: {p}", err=True)
+                    except Exception as e:
+                        click.echo(f"Error changing directory: {e}", err=True)
+                continue
+
             if q == "ev":
                 # everything
                 subprocess.Popen(["C:\\Program Files\\Everything\\Everything.exe", "-search", f"path:{os.getcwd()}"])
-            if q.startswith("cd "):
-                path = q[3:].strip()
-                if path:
-                    try:
-                        os.chdir(path)
-                    except FileNotFoundError:
-                        click.echo(f"Directory not found: {path}")
                 continue
-            if q.startswith("dir") or q.startswith("type "):
+
+            # --- 3. Check for qt subcommands ---
+            args = q.split()
+            cmd = args[0] if args else ""
+
+            if cmd in qt_commands:
+                # Delegate to the main qt entry point
+                _run_qt_line(ctx=ctx, line=q, debug=debug, prog_name="qt uber")
+
+            # --- 4. Default: Delegate to the system shell ---
+            else:
                 # pass dir and its arguments to cmd
                 result = subprocess.run(q, shell=True, text=True, capture_output=True)
                 if result.stdout:
                     click.echo(result.stdout.rstrip("\n"))
                 if result.stderr:
                     click.echo(result.stderr.rstrip("\n"))
-                continue
-
-            # Delegate everything else to the main qt entry point
-            _run_qt_line(ctx=ctx, line=q, debug=debug, prog_name="qt uber")
+                # gemini says
+                # try:
+                #     # This now handles 'dir', 'type', 'tree', 'explorer', 'ev', etc.
+                #     # It streams output directly to the console.
+                #     subprocess.run(q, shell=True)
+                # except Exception as e:
+                #     # Catch potential errors from shell execution
+                #     click.echo(f"Shell command failed: {e}", err=True)
 
         except KeyboardInterrupt:
             # Ctrl+C: just move to a new prompt
@@ -1363,7 +1309,6 @@ def uber(ctx: click.Context, prompt_label: str, debug: bool) -> None:
         except EOFError:
             # Ctrl+D: exit the shell
             break
-
 
 # scripting  ====================================================
 @entry.command()
@@ -1415,3 +1360,16 @@ def script(ctx: click.Context, script_file: Path, debug: bool) -> None:
 
     # leftover command without trailing newline
     flush()
+
+
+@entry.command()
+@click.argument(
+    "strings",
+    nargs=-1,
+    type=str
+)
+def echo(strings):
+    """
+    Echoes the given strings, joined by spaces.
+    """
+    click.echo(' '.join(strings))

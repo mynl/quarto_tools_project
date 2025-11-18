@@ -1,0 +1,9 @@
+echo DEBUG Scripts
+
+echo
+
+echo Run bibtex on PMIR
+
+bibtex \s\TELOS\PMIR_StudyNote\working-blog -b pmir.bib -d pmir.csv
+# bibtex \s\TELOS\PMIR_StudyNote\working-blog -b pmir.bib -d pmir.csv
+

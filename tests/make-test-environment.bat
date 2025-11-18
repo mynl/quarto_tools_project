@@ -71,5 +71,11 @@ for %%P in (%PAIRS%) do (
     )
 )
 
+echo =====================================================
+echo Copying some individual files
+echo =====================================================
+copy C:\S\TELOS\Blog\quarto\ConvexConsiderations\posts\notes\2025-11-15-The-Periodic-Table-Again\index.qmd elements.qmd
+copy C:\Users\steve\S\TELOS\Blog\quarto\ConvexConsiderations\posts\notes\2025-02-06-Tweedie-distributions\index.qmd fft.qmd
+
 echo Done.
 endlocal
