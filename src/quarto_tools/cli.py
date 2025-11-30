@@ -4,16 +4,17 @@ quarto_tools command line interface.
 
 from pathlib import Path
 import subprocess
-import os
 import shlex
-import subprocess
+import os
 
 import click
-from prompt_toolkit import PromptSession
-from prompt_toolkit.completion import FuzzyCompleter, NestedCompleter, PathCompleter
+# from prompt_toolkit import PromptSession
+# from prompt_toolkit.completion import FuzzyCompleter, NestedCompleter, PathCompleter
 from prompt_toolkit.formatted_text import HTML
 import pandas as pd
 from greater_tables import GT
+# for uber loop
+from great2.shell import UberShell
 
 from .utils import resolve_quarto_context
 from .toc import QuartoToc
@@ -22,6 +23,7 @@ from .xref import QuartoXRefs
 from .tidy import QuartoTidy
 from .pytest_qmd import QuartoPyTest
 from .consolidate import QuartoConsolidate
+from .blog import (BLOG_BASE, blog_new_post_work, TikzProcessor)
 
 
 # helpers ===================================================================
@@ -1187,128 +1189,247 @@ def qpytest_run_parallel(
             )
 
 
-# uber  ====================================================
+# blog =====================================================
 @entry.command()
-@click.pass_context
-@click.option(
-    "-p",
-    "--prompt-label",
-    type=str,
-    default="qt uber",
-    show_default=True,
-    help="Label shown in the uber prompt.",
-)
-@click.option(
-    "-d",
-    "--debug",
-    is_flag=True,
-    help="Print parsed commands before executing them.",
-)
-def uber(ctx: click.Context, prompt_label: str, debug: bool) -> None:
+@click.argument("title", required=True)
+@click.argument("categories", type=str, nargs=-1, required=True)
+@click.option("-d", "--date", type=str, default='', help="Set date of post, default is today.")
+@click.option("-s", "--description", type=str, default='', help="Set description string of post.")
+@click.option('-c', "--csl", type=str, default='',
+              help="Set csl file, default is Inventiones mathematicae, use jru for Journal of Risk and Uncertainty.")
+@click.option('-f', "--draft", is_flag=True, help="Set draft mode flag in yaml.")
+def blog_new_post(title, categories, date, description, csl, draft):
     """
-        Interactive shell for quarto_tools.
+    Create a new blog page with TITLE. Enter categories with -c. For example.
 
-        Loads the library once, then lets you run qt subcommands repeatedly with
-        completion and history. Type 'q' or 'exit' to leave.
-        """
-    # 1. Build list of *your* app's commands
-    qt_commands = sorted(entry.commands.keys())
-    help_string =(
-        "Type a qt sub-command, a shell command (e.g. 'dir', 'tree'), or 'q' to quit.\n"
-        "Use --help to access CLI built-in help. Known commands are:\n\t" +
-        '\n\t'.join(qt_commands)
-    )
-    if debug:
-        click.echo(help_string)
+        blog-new-post "My post title" about,llm
 
-    # 2. Build list of REPL built-in commands
-    repl_builtins = ["cd", "pwd", "cls", "q", "x", "quit", "exit", "help", "ev", "h", "?"]
+    Optionally set DATE, DESCRIPTION, CSL, and DRAFT.
+    """
+    assert isinstance(categories, (list, tuple)
+                      ), f'Expected list, got {type(categories)}'
+    categories = list(categories)
+    title = title.replace('"', '').replace("'", "")
+    image = ''
+    if categories[0] not in ('about', 'meta', 'notes', 'presentations', 'programming', 'publications', 'research'):
+        print(f'First category {categories[0]}, '
+               'must be one of about, meta, notes, presentations, programming, publications, research')
+        print('Try again...')
+    else:
+        blog_new_post_work(title, categories, date,
+                           description, image, csl, draft)
 
-    # 3. Setup completer
-    dcommands: dict[str, object] = {name: None for name in qt_commands + repl_builtins}
-    dcommands["cd"] = PathCompleter(only_directories=True, expanduser=True)
-    completer = FuzzyCompleter(NestedCompleter(dcommands))
-    session = PromptSession(completer=completer)
 
-    def _prompt() -> str:
-        # cwd = Path.cwd()
-        # return HTML(f"<ansigreen>{cwd}</ansigreen> <ansired> {prompt_label} > </ansired>")
-        return HTML(f"<ansired> {prompt_label} > </ansired>")
+@entry.command()
+@click.argument("dirname", type=str, default=BLOG_BASE)
+def blog_outdated(dirname):
+    """
+    Find posts in dirname/posts that are newer than their corresponding
+    html file in dirname/docs.
 
-    while True:
-        try:
-            q = session.prompt(_prompt()).strip()
+    :param dirname:
+    :return:
+    """
+    base = Path(dirname)
+    posts = base / 'posts'
+    docs = base / 'docs'
+    post_files = [i for i in posts.rglob(
+        '*') if i.suffix.lower() in ['.qmd', '.ipynb']]
+    post_files.extend(i for i in base.rglob(
+        '*') if i.suffix.lower() in ['.qmd', '.ipynb'])
+    post_files = [i for i in post_files if
+                  str(i.resolve()).find('.jupyter_cache') == -1
+                  and str(i.resolve()).find('.ipynb_checkpoints') == -1]
+    needs_updating = []
+    missing = []
+    for p in post_files:
+        html = docs / (p.stem + '.html')
+        if not html.exists():
+            missing.append(p)
+        elif p.stat().st_mtime > html.stat().st_mtime:
+            needs_updating.append(p)
+        else:
+            pass
+    if missing:
+        print('The following posts need creating')
+        for i, p in enumerate(missing):
+            print(f'{i + 1:3d}.  {p}')
+    if needs_updating:
+        print('The following posts need updating')
+        for i, p in enumerate(needs_updating):
+            print(f'{i + 1:3d}.  {p}')
+    if not missing and not needs_updating:
+        print('No posts need updating')
 
-            if not q:
-                continue
 
-            # --- 1. Handle REPL exit commands ---
-            if q in {"q", "x", "quit", "exit", ".."}:
-                break
+# @click.option('-o', '--out-dir', default='..\\img')
+@entry.command()
+@click.argument("in-file", type=click.Path(exists=False))
+@click.option('-v', '--verbose', is_flag=True)
+@click.option('-l', '--lua-engine', is_flag=True)
+def tikz(in_file, lua_engine, verbose):
+    """
+    Process in-file through TeX and pdf to svg. Default
+    output in ../img. Default behaviour to tidy up; use -v for
+    verbose mode. Use -l for lua TeX engine.
+    if verbose: leave the tex and pdf files, else tidy
+    """
+    try:
+        if not Path(in_file).exists():
+            if Path(in_file).with_suffix('.tikz').exists():
+                in_file += '.tikz'
+            elif Path(in_file).with_suffix('.tz').exists():
+                in_file += '.tz'
+            print(f'processing: {in_file}')
+        t = TikzProcessor(in_file,
+                          tex_engine='lualatex' if lua_engine else 'pdflatex')
+        t.process_tikz(verbose=verbose)
+    except FileNotFoundError:
+        print(f'Error: {in_file} does not exist')
 
-            # --- 2. Handle REPL built-in commands ---
-            if q in {"h", "?", "help"}:
-                click.echo(help_string)
-                continue
 
-            if q == "cls":
-                os.system("cls")
-                continue
+# uber  ====================================================
+# @entry.command()
+# @click.pass_context
+# @click.option(
+#     "-p",
+#     "--prompt-label",
+#     type=str,
+#     default="qt uber",
+#     show_default=True,
+#     help="Label shown in the uber prompt.",
+# )
+# @click.option(
+#     "-d",
+#     "--debug",
+#     is_flag=True,
+#     help="Print parsed commands before executing them.",
+# )
+# def uber_old(ctx: click.Context, prompt_label: str, debug: bool) -> None:
+#     """
+#         Interactive shell for quarto_tools.
 
-            if q in {"pwd", "cwd", "cd"}:
-                click.echo(Path.cwd())
-                continue
+#         Loads the library once, then lets you run qt subcommands repeatedly with
+#         completion and history. Type 'q' or 'exit' to leave.
+#         """
+#     # 1. Build list of *your* app's commands
+#     qt_commands = sorted(entry.commands.keys())
+#     help_string =(
+#         "Type a qt sub-command, a shell command (e.g. 'dir', 'tree'), or 'q' to quit.\n"
+#         "Use --help to access CLI built-in help. Known commands are:\n\t" +
+#         '\n\t'.join(qt_commands)
+#     )
+#     if debug:
+#         click.echo(help_string)
 
-            if q.startswith("cd "):
-                path_str = q[3:].strip()
-                if path_str:
-                    try:
-                        p = Path(path_str).expanduser()
-                        os.chdir(p)  # This must be os.chdir to affect the parent process
-                    except FileNotFoundError:
-                        click.echo(f"Directory not found: {p}", err=True)
-                    except NotADirectoryError:
-                         click.echo(f"Not a directory: {p}", err=True)
-                    except Exception as e:
-                        click.echo(f"Error changing directory: {e}", err=True)
-                continue
+#     # 2. Build list of REPL built-in commands
+#     repl_builtins = ["cd", "pwd", "cls", "q", "x", "quit", "exit", "help", "ev", "h", "?"]
 
-            if q == "ev":
-                # everything
-                subprocess.Popen(["C:\\Program Files\\Everything\\Everything.exe", "-search", f"path:{os.getcwd()}"])
-                continue
+#     # 3. Setup completer
+#     dcommands: dict[str, object] = {name: None for name in qt_commands + repl_builtins}
+#     dcommands["cd"] = PathCompleter(only_directories=True, expanduser=True)
+#     completer = FuzzyCompleter(NestedCompleter(dcommands))
+#     session = PromptSession(completer=completer)
 
-            # --- 3. Check for qt subcommands ---
-            args = q.split()
-            cmd = args[0] if args else ""
+#     def _prompt() -> str:
+#         # cwd = Path.cwd()
+#         # return HTML(f"<ansigreen>{cwd}</ansigreen> <ansired> {prompt_label} > </ansired>")
+#         return HTML(f"<ansired> {prompt_label} > </ansired>")
 
-            if cmd in qt_commands:
-                # Delegate to the main qt entry point
-                _run_qt_line(ctx=ctx, line=q, debug=debug, prog_name="qt uber")
+#     while True:
+#         try:
+#             q = session.prompt(_prompt()).strip()
 
-            # --- 4. Default: Delegate to the system shell ---
-            else:
-                # pass dir and its arguments to cmd
-                result = subprocess.run(q, shell=True, text=True, capture_output=True)
-                if result.stdout:
-                    click.echo(result.stdout.rstrip("\n"))
-                if result.stderr:
-                    click.echo(result.stderr.rstrip("\n"))
-                # gemini says
-                # try:
-                #     # This now handles 'dir', 'type', 'tree', 'explorer', 'ev', etc.
-                #     # It streams output directly to the console.
-                #     subprocess.run(q, shell=True)
-                # except Exception as e:
-                #     # Catch potential errors from shell execution
-                #     click.echo(f"Shell command failed: {e}", err=True)
+#             if not q:
+#                 continue
 
-        except KeyboardInterrupt:
-            # Ctrl+C: just move to a new prompt
-            continue
-        except EOFError:
-            # Ctrl+D: exit the shell
-            break
+#             # --- 1. Handle REPL exit commands ---
+#             if q in {"q", "x", "quit", "exit", ".."}:
+#                 break
+
+#             # --- 2. Handle REPL built-in commands ---
+#             if q in {"h", "?", "help"}:
+#                 click.echo(help_string)
+#                 continue
+
+#             if q == "cls":
+#                 os.system("cls")
+#                 continue
+
+#             if q in {"pwd", "cwd", "cd"}:
+#                 click.echo(Path.cwd())
+#                 continue
+
+#             if q.startswith("cd "):
+#                 path_str = q[3:].strip()
+#                 if path_str:
+#                     try:
+#                         p = Path(path_str).expanduser()
+#                         os.chdir(p)  # This must be os.chdir to affect the parent process
+#                     except FileNotFoundError:
+#                         click.echo(f"Directory not found: {p}", err=True)
+#                     except NotADirectoryError:
+#                          click.echo(f"Not a directory: {p}", err=True)
+#                     except Exception as e:
+#                         click.echo(f"Error changing directory: {e}", err=True)
+#                 continue
+
+#             if q == "ev":
+#                 # everything
+#                 subprocess.Popen(["C:\\Program Files\\Everything\\Everything.exe", "-search", f"path:{os.getcwd()}"])
+#                 continue
+
+#             # --- 3. Check for qt subcommands ---
+#             args = q.split()
+#             cmd = args[0] if args else ""
+
+#             if cmd in qt_commands:
+#                 # Delegate to the main qt entry point
+#                 _run_qt_line(ctx=ctx, line=q, debug=debug, prog_name="qt uber")
+
+#             # --- 4. Default: Delegate to the system shell ---
+#             else:
+#                 # pass dir and its arguments to cmd
+#                 result = subprocess.run(q, shell=True, text=True, capture_output=True)
+#                 if result.stdout:
+#                     click.echo(result.stdout.rstrip("\n"))
+#                 if result.stderr:
+#                     click.echo(result.stderr.rstrip("\n"))
+#                 # gemini says
+#                 # try:
+#                 #     # This now handles 'dir', 'type', 'tree', 'explorer', 'ev', etc.
+#                 #     # It streams output directly to the console.
+#                 #     subprocess.run(q, shell=True)
+#                 # except Exception as e:
+#                 #     # Catch potential errors from shell execution
+#                 #     click.echo(f"Shell command failed: {e}", err=True)
+
+#         except KeyboardInterrupt:
+#             # Ctrl+C: just move to a new prompt
+#             continue
+#         except EOFError:
+#             # Ctrl+D: exit the shell
+#             break
+
+# new uber technology ==========================================
+# gemini 3 Nov 2025
+@entry.command()
+@click.option("--debug", is_flag=True)
+def uber(debug):
+    """QT Standalone Shell."""
+    shell = UberShell("qt", debug)
+    # Register QT commands, exclude 'uber' to prevent recursion
+    shell.register_click_group(entry, exclude=["uber"])
+
+    def prompt_function():
+        """Prompt uses breadcrumb chain from UBERSHELL_CHAIN plus current library."""
+        chain = os.environ.get("UBERSHELL_CHAIN", shell.prompt_label)
+        return HTML(
+            f"<ansired>{chain} > </ansired>"
+        )
+
+    shell.start(prompt_function=prompt_function)
+
 
 # scripting  ====================================================
 @entry.command()

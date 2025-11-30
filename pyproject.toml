@@ -46,3 +46,7 @@ version = { attr = "quarto_tools.__version__" }
 
 [project.scripts]
 qt = "quarto_tools.cli:entry"
+
+# Magic discovery by uber routine
+[project.entry-points."uber.plugins"]
+qt = "quarto_tools.cli:entry"
